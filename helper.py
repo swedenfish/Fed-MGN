@@ -198,13 +198,20 @@ def cast_data(array_of_tensors, subject_type = None, flat_mask = None):
     return dataset
 
 
-def show_image(img, i, k=0):
+def show_image(img, i, k):
+    #Fold i and Client k
     img = np.repeat(np.repeat(img, 10, axis=1), 10, axis=0)
     plt.imshow(img)
     plt.title("Fold " + str(i) + " Client " + str(k))
     plt.axis('off')
     if not os.path.exists('output/' + "CBT_images"):
         os.mkdir('output/' + "CBT_images")
-    # if not os.path.exists('output/' + "CBT_images" + '/' + Setup_name):
-    #     os.mkdir('output/' + "CBT_images" + '/' + Setup_name)
-    plt.savefig(str(i) + "_" + str(k) ,bbox_inches='tight')
+    if not os.path.exists('output/' + "CBT_images" + '/' + "Fold " + str(i)):
+        os.mkdir('output/' + "CBT_images" + '/' + "Fold " + str(i))
+    plt.savefig('output/' + "CBT_images" + '/' + "Fold " + str(i) + "/" + "Client " + str(k) ,bbox_inches='tight')
+    
+    
+#Clears the given directory
+def clear_dir(dir_name):
+    for file in os.listdir(dir_name):
+        os.remove(os.path.join(dir_name, file))

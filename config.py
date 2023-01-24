@@ -9,6 +9,8 @@ MODEL_WEIGHT_BACKUP_PATH = "./output/model_weights"
 DEEP_CBT_SAVE_PATH = "./output/deep_cbts"
 TEMP_FOLDER = "./temp"
 
+number_of_clients = 1
+fed = False
 
 #Model Configuration
 N_ROIs = 35
