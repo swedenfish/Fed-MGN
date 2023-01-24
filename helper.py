@@ -207,4 +207,4 @@ def show_image(img, i, k=0):
         os.mkdir('output/' + "CBT_images")
     # if not os.path.exists('output/' + "CBT_images" + '/' + Setup_name):
     #     os.mkdir('output/' + "CBT_images" + '/' + Setup_name)
-    plt.savefig(str(i), bbox_inches='tight')
+    plt.savefig(str(i) + "_" + str(k) ,bbox_inches='tight')
