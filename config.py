@@ -9,10 +9,13 @@ MODEL_WEIGHT_BACKUP_PATH = "./output/model_weights"
 DEEP_CBT_SAVE_PATH = "./output/deep_cbts"
 TEMP_FOLDER = "./temp"
 
-number_of_clients = 1
+#Control variables
+number_of_clients = 2
 fed = False
 early_stop_rounds = 5
 n_max_epochs = 100
+early_stop = True
+
 
 #Model Configuration
 N_ROIs = 35

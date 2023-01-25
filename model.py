@@ -353,11 +353,10 @@ class MGN_NET(torch.nn.Module):
                             data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4) * model_params["lambda_kl"], time_elapsed))
                         try:
                             #Early stopping and restoring logic
-                            #需要改为用一个list来存每个client是否early stop
-                            if len(test_errors_rep) > early_stop_rounds and early_stop:
+                            if len(test_errors_rep) > early_stop_rounds:
                                 torch.save(model.state_dict(), "./temp/weight_" + model_id + "_" + str(rep_loss)[:5]  + ".model")
                                 last_errors = test_errors_rep[-early_stop_rounds:]
-                                if(all(last_errors[i+1] < last_errors[i] for i in range(early_stop_rounds-1))):
+                                if(early_stop and all(last_errors[i+1] < last_errors[i] for i in range(early_stop_rounds-1))):
                                     print("Client " + str(j) +" Early Stopping")
                                     early_stop_dict[j] = True
                         except:
