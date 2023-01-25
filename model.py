@@ -273,10 +273,18 @@ class MGN_NET(torch.nn.Module):
 
         for i in range(n_folds):
             print("********* FOLD {} *********".format(i))
+            losses_list = []
+            # torch.cuda.empty_cache() 
+            
             model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
             number_views = 4
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
+            
+            if fed:
+                main_model = MGN_NET(dataset)
+                main_model = main_model.to(device)
+                main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
             #Ready to start
             for epoch in range(n_max_epochs):
@@ -328,11 +336,17 @@ class MGN_NET(torch.nn.Module):
                         kl_loss = (kl_loss_1 + kl_loss_2 + kl_loss_3 + kl_loss_4)
                         rep_loss = (l * loss_weightes[:random_sample_size * n_attr]).mean()
                         losses.append(kl_loss * model_params["lambda_kl"] + rep_loss)
-                        
-                    optimizer.zero_grad()
-                    loss = torch.mean(torch.stack(losses))
-                    loss.backward()
-                    optimizer.step()
+                    
+                    if not fed:    
+                        optimizer.zero_grad()
+                        loss = torch.mean(torch.stack(losses))
+                        loss.backward()
+                        optimizer.step()
+                    else:
+                        # send_losses(losses)
+                        losses_list.append(losses)
+
+               
                 
                 if epoch % 10 == 0:
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
@@ -364,6 +378,21 @@ class MGN_NET(torch.nn.Module):
                             break
                     tick = tock
                     
+                 # update_main_model()
+                if fed and not all(early_stop_dict[i] == True for i in range(number_of_clients)):
+                    main_optimizer.zero_grad()
+                    losses_all = [single_loss for losses in losses_list for single_loss in losses]
+                    # print("update main model")
+                    loss = torch.mean(torch.stack(losses_all))
+                    loss.backward()
+                    main_optimizer.step()
+                    
+                    #send_model_back()
+                    model_dict = []
+                    for n in range(number_of_clients):
+                        model_dict.append(main_model)
+                    losses_list = []
+                        
             for j in range(number_of_clients):
                 model = model_dict[j]
                 test_errors_rep = test_errors_rep_dict[j]

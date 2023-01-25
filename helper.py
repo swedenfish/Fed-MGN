@@ -89,7 +89,8 @@ def generate_same_folds_for_matlab(data_path, n_folds):
             mdict = {"train": np.array(train_data).swapaxes(3,0), "test": np.array(test_data).swapaxes(3,0)}
             save_path = "/data_{}_{}.mat".format(data_path.split("/")[-1], i)
             scipy.io.savemat("./netNorm/dataset" + save_path , mdict)
-
+            
+#Clears the given directory
 def clear_dir(dir_name):
     for file in os.listdir(dir_name):
         os.remove(os.path.join(dir_name, file))
@@ -209,9 +210,3 @@ def show_image(img, i, k):
     if not os.path.exists('output/' + "CBT_images" + '/' + "Fold " + str(i)):
         os.mkdir('output/' + "CBT_images" + '/' + "Fold " + str(i))
     plt.savefig('output/' + "CBT_images" + '/' + "Fold " + str(i) + "/" + "Client " + str(k) ,bbox_inches='tight')
-    
-    
-#Clears the given directory
-def clear_dir(dir_name):
-    for file in os.listdir(dir_name):
-        os.remove(os.path.join(dir_name, file))
