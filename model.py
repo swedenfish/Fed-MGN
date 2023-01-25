@@ -1,7 +1,7 @@
 import torch
 import helper
 import config
-from config import number_of_clients, fed
+from config import number_of_clients, fed, early_stop_rounds
 import random
 import uuid
 import os
@@ -276,10 +276,11 @@ class MGN_NET(torch.nn.Module):
             model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
             number_views = 4
             tick = time.time()
+            early_stop_dict = [False] * number_of_clients
             
             #Ready to start
             for epoch in range(n_max_epochs):
-                for j in range(number_of_clients):
+                for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                     model = model_dict[j]
                     model.train()
                     losses = []
@@ -334,7 +335,7 @@ class MGN_NET(torch.nn.Module):
                     optimizer.step()
                 
                 if epoch % 10 == 0:
-                    for j in range(number_of_clients):
+                    for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                         model = model_dict[j]
                         train_casted = train_casted_dict[j]
                         #TODO
@@ -353,12 +354,12 @@ class MGN_NET(torch.nn.Module):
                         try:
                             #Early stopping and restoring logic
                             #需要改为用一个list来存每个client是否early stop
-                            if len(test_errors_rep) > 5 and early_stop:
+                            if len(test_errors_rep) > early_stop_rounds and early_stop:
                                 torch.save(model.state_dict(), "./temp/weight_" + model_id + "_" + str(rep_loss)[:5]  + ".model")
-                                last_5 = test_errors_rep[-5:]
-                                if(all(last_5[i] < last_5[i + 1] for i in range(4))):
-                                    print("Early Stopping")
-                                    break
+                                last_errors = test_errors_rep[-early_stop_rounds:]
+                                if(all(last_errors[i+1] < last_errors[i] for i in range(early_stop_rounds-1))):
+                                    print("Client " + str(j) +" Early Stopping")
+                                    early_stop_dict[j] = True
                         except:
                             print("ERROR occured")
                             break
@@ -386,6 +387,6 @@ class MGN_NET(torch.nn.Module):
                 
                 helper.show_image(cbt, i, j)
                 
-                print("FINAL RESULTS  REP: {}  KL: {}".format(rep_loss, kl_loss))
+                print("FINAL RESULTS  Client {}  REP: {}  KL: {}".format(j, rep_loss, kl_loss))
             
         return models

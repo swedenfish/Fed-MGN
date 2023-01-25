@@ -11,6 +11,8 @@ TEMP_FOLDER = "./temp"
 
 number_of_clients = 1
 fed = False
+early_stop_rounds = 5
+n_max_epochs = 100
 
 #Model Configuration
 N_ROIs = 35
