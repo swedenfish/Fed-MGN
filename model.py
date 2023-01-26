@@ -1,7 +1,8 @@
 import torch
 import helper
 import config
-from config import number_of_clients, fed, early_stop_rounds
+from config import number_of_clients, fed, early_stop_rounds, temporal_weighting, average_all
+import copy
 import random
 import uuid
 import os
@@ -127,6 +128,123 @@ class MGN_NET(torch.nn.Module):
             test_errors_rep_dict.append(test_errors_rep)
         test_casted = [d.to(device) for d in helper.cast_data(test_data)]
         return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted)
+    
+    def send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
+                                                   number_of_samples, clients_with_access):
+        '''
+        This function updates clients with the newly global model so that all the devices can take advantage of the common
+        information.
+        '''
+        with torch.no_grad():
+            for i in range(number_of_samples): # clients_with_access 
+
+                model_dict[i].conv1.nn[0].weight.data = main_model.conv1.nn[0].weight.data.clone()
+                model_dict[i].conv1.nn[0].bias.data = main_model.conv1.nn[0].bias.data.clone()
+                model_dict[i].conv1.bias.data = main_model.conv1.bias.data.clone() 
+                # model_dict[i].conv1.lin = copy.deepcopy(main_model.conv1.lin)
+
+                model_dict[i].conv2.nn[0].weight.data = main_model.conv2.nn[0].weight.data.clone()
+                model_dict[i].conv2.nn[0].bias.data = main_model.conv2.nn[0].bias.data.clone()
+                model_dict[i].conv2.bias.data = main_model.conv2.bias.data.clone() 
+                # model_dict[i].conv2.lin = copy.deepcopy(main_model.conv2.lin)
+                
+                model_dict[i].conv3.nn[0].weight.data = main_model.conv3.nn[0].weight.data.clone()
+                model_dict[i].conv3.nn[0].bias.data = main_model.conv3.nn[0].bias.data.clone()
+                model_dict[i].conv3.bias.data = main_model.conv3.bias.data.clone() 
+                # model_dict[i].conv3.lin = copy.deepcopy(main_model.conv3.lin) 
+                
+        return model_dict
+    
+    def set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, model_dict, \
+                                                                     number_of_samples, clients_with_access, \
+                                                                    last_updated_dict, current_epoch):
+        '''
+        This function takes combined weights for global model and assigns them to the global model.
+        '''
+        conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root, \
+        conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root, \
+        conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root = MGN_NET.get_averaged_weights(model_dict, \
+                                                        number_of_samples, clients_with_access, \
+                                                        average_all, last_updated_dict, current_epoch)
+        
+        with torch.no_grad():
+            main_model.conv1.nn[0].weight.data = conv1_nn_mean_weight.clone()
+            main_model.conv1.nn[0].bias.data = conv1_nn_mean_bias.clone()
+            main_model.conv1.bias.data = conv1_bias.clone()
+            # main_model.conv1.lin = copy.deepcopy(conv1_root)
+            
+            main_model.conv2.nn[0].weight.data = conv2_nn_mean_weight.clone()
+            main_model.conv2.nn[0].bias.data = conv2_nn_mean_bias.clone()
+            main_model.conv2.bias.data = conv2_bias.clone()
+            # main_model.conv2.lin = conv2_root.clone()
+            
+            main_model.conv3.nn[0].weight.data = conv3_nn_mean_weight.clone()
+            main_model.conv3.nn[0].bias.data = conv3_nn_mean_bias.clone()
+            main_model.conv3.bias.data = conv3_bias.clone()
+            # main_model.conv3.lin = conv3_root.clone()
+
+        return main_model
+
+    def get_averaged_weights(model_dict, number_of_samples, clients_with_access, \
+                         average_all=True, last_updated_dict=None, current_epoch=-1):
+        '''
+        This function averages model weights after a designated number of round so that we can have the weights of the global model
+        that takes full advantage of introduced devices in the federated pipeline.
+        '''
+        size_1 = list(model_dict[0].conv1.lin.weight.shape)
+        size_2 = list(model_dict[0].conv2.lin.weight.shape)
+        size_3 = list(model_dict[0].conv3.lin.weight.shape)
+        
+        conv1_nn_mean_weight = torch.zeros(size=model_dict[0].conv1.nn[0].weight.data.shape).to(device)
+        conv1_nn_mean_bias = torch.zeros(size=model_dict[0].conv1.nn[0].bias.data.shape).to(device)
+        conv1_bias = torch.zeros(size=model_dict[0].conv1.bias.data.shape).to(device)
+        conv1_root = torch.zeros(size_1[1], size_1[0]).to(device)
+        
+        conv2_nn_mean_weight = torch.zeros(size=model_dict[0].conv2.nn[0].weight.data.shape).to(device)
+        conv2_nn_mean_bias = torch.zeros(size=model_dict[0].conv2.nn[0].bias.data.shape).to(device)
+        conv2_bias = torch.zeros(size=model_dict[0].conv2.bias.data.shape).to(device)
+        conv2_root = torch.zeros(size_2[1], size_2[0]).to(device)    
+        
+        conv3_nn_mean_weight = torch.zeros(size=model_dict[0].conv3.nn[0].weight.data.shape).to(device)
+        conv3_nn_mean_bias = torch.zeros(size=model_dict[0].conv3.nn[0].bias.data.shape).to(device)
+        conv3_bias = torch.zeros(size=model_dict[0].conv3.bias.data.shape).to(device)
+        conv3_root = torch.zeros(size_3[1], size_3[0]).to(device)
+        
+        cls = None # 
+        if average_all:
+            cls = range(number_of_samples)
+        else:
+            cls = clients_with_access
+
+        with torch.no_grad():
+            def getWeight_i(i):
+                return ((np.e / 2) ** (- (current_epoch - last_updated_dict['client'+str(i)])))
+            for i in cls: # cls
+                if temporal_weighting == True:
+                    all_weights = getWeight_i(0) + getWeight_i(1) + getWeight_i(2)
+                    client_weight = getWeight_i(i) / all_weights
+                else:
+                    client_weight = 1/len(cls)
+
+                conv1_nn_mean_weight += (client_weight * model_dict[i].conv1.nn[0].weight.data.clone())
+                conv1_nn_mean_bias += (client_weight * model_dict[i].conv1.nn[0].bias.data.clone())
+                conv1_bias += (client_weight * model_dict[i].conv1.bias.data.clone())
+                # conv1_root += (client_weight * copy.deepcopy(model_dict[i].conv1.lin))
+                # conv1_root += (client_weight * model_dict[i].conv1.lin.data.clone())
+                
+                conv2_nn_mean_weight += (client_weight * model_dict[i].conv2.nn[0].weight.data.clone())
+                conv2_nn_mean_bias += (client_weight * model_dict[i].conv2.nn[0].bias.data.clone())
+                conv2_bias += (client_weight * model_dict[i].conv2.bias.data.clone())
+                # conv2_root += (client_weight * copy.deepcopy(model_dict[i].conv2.lin).weight)
+                
+                conv3_nn_mean_weight += (client_weight * model_dict[i].conv3.nn[0].weight.data.clone())
+                conv3_nn_mean_bias += (client_weight * model_dict[i].conv3.nn[0].bias.data.clone())
+                conv3_bias += (client_weight * model_dict[i].conv3.bias.data.clone())
+                # conv3_root += (client_weight * copy.deepcopy(model_dict[i].conv3.lin).weight)
+
+        return conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root, \
+                conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root, \
+                conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root
     
     @staticmethod
     def generate_subject_biased_cbts(model, train_data):
@@ -273,6 +391,11 @@ class MGN_NET(torch.nn.Module):
 
         for i in range(n_folds):
             print("********* FOLD {} *********".format(i))
+                                    
+            main_model = MGN_NET(dataset)
+            main_model = main_model.to(device)
+            main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
+            
             model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
             number_views = 4
             tick = time.time()
@@ -353,8 +476,8 @@ class MGN_NET(torch.nn.Module):
                             data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4) * model_params["lambda_kl"], time_elapsed))
                         try:
                             #Early stopping and restoring logic
+                            torch.save(model.state_dict(), "./temp/weight_" + model_id + "_" + str(rep_loss)[:5]  + ".model")
                             if len(test_errors_rep) > early_stop_rounds:
-                                torch.save(model.state_dict(), "./temp/weight_" + model_id + "_" + str(rep_loss)[:5]  + ".model")
                                 last_errors = test_errors_rep[-early_stop_rounds:]
                                 if(early_stop and all(last_errors[i+1] < last_errors[i] for i in range(early_stop_rounds-1))):
                                     print("Client " + str(j) +" Early Stopping")
@@ -363,7 +486,17 @@ class MGN_NET(torch.nn.Module):
                             print("ERROR occured")
                             break
                     tick = tock
-                    
+                
+                if fed:
+                    # update main models from all parameters received
+                    main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
+                                      model_dict, number_of_clients, \
+                                        list(range(0, number_of_clients)), None, epoch+1)           
+                
+                    # send models to all clients
+                    MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
+                                                                number_of_clients, list(range(0, number_of_clients)))
+                            
             for j in range(number_of_clients):
                 model = model_dict[j]
                 test_errors_rep = test_errors_rep_dict[j]

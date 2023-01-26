@@ -10,12 +10,14 @@ DEEP_CBT_SAVE_PATH = "./output/deep_cbts"
 TEMP_FOLDER = "./temp"
 
 #Control variables
-number_of_clients = 2
-fed = False
+number_of_clients = 3
+fed = True
 early_stop_rounds = 5
 n_max_epochs = 100
 early_stop = True
 
+temporal_weighting = False
+average_all = True
 
 #Model Configuration
 N_ROIs = 35
