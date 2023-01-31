@@ -2,8 +2,8 @@
 RANDOM_SEED = 35813
 
 #Some important paths
-DATASET_PATH = "./simulated_dataset/example.npy"
-# DATASET_PATH = "./input/dataset.npy"
+# DATASET_PATH = "./simulated_dataset/example.npy"
+DATASET_PATH = "./input/dataset.npy"
 
 MODEL_WEIGHT_BACKUP_PATH = "./output/model_weights"
 DEEP_CBT_SAVE_PATH = "./output/deep_cbts"
@@ -11,20 +11,24 @@ TEMP_FOLDER = "./temp"
 
 #Control variables
 number_of_clients = 3
-fed = True
+fed = False
 early_stop_rounds = 5
 n_max_epochs = 100
-early_stop = True
+early_stop = False
+number_of_folds = 3
 
 temporal_weighting = False
 average_all = True
+
+# Should be decided by input shape
+number_of_views = 6
 
 #Model Configuration
 N_ROIs = 35
 N_RANDOM_SAMPLES = 10
 
 #Model hyperparams
-Nattr = 4
+Nattr = number_of_views
 CONV1 = 36
 CONV2 = 24
 CONV3 = 5

@@ -1,7 +1,7 @@
 import torch
 import helper
 import config
-from config import number_of_clients, fed, early_stop_rounds, temporal_weighting, average_all
+from config import number_of_clients, early_stop_rounds, temporal_weighting, average_all
 import copy
 import random
 import uuid
@@ -81,8 +81,19 @@ class MGN_NET(torch.nn.Module):
         n_attr = config.Nattr
         dataset = "simulated"
         model_params = config.PARAMS
-        all_train_data, test_data, _, _ = helper.preprocess_data_array(data_path,
+        if(n_folds > 1):
+            all_train_data, test_data, _, _ = helper.preprocess_data_array(data_path,
                                 number_of_folds=n_folds, current_fold_id=i)
+        #TODO
+        elif(n_folds == 1):
+            all_data = np.load(data_path)
+            length = all_data.shape[0]
+            print(length)
+            all_train_data = all_data[:round(length*0.8)]
+            test_data = all_data[round(length*0.8):]
+        else:
+            print("n_folds error: " + n_folds)
+            
         number_of_data = all_train_data.shape[0]
         
         model_dict = []
@@ -355,7 +366,7 @@ class MGN_NET(torch.nn.Module):
         return sum(frobenius_all) / len(frobenius_all)
     
     @staticmethod
-    def train_model(n_max_epochs, data_path, early_stop, model_name, weighted_loss = True, random_sample_size_para = 10, n_folds = 5):
+    def train_model(n_max_epochs, data_path, early_stop, model_name, fed, loss_table_list, weighted_loss = True, random_sample_size_para = 10, n_folds = 5):
         """
             Trains a model for each cross validation fold and 
             saves all models along with CBTs to ./output/<model_name> 
@@ -374,6 +385,7 @@ class MGN_NET(torch.nn.Module):
         models = []
         n_attr = config.Nattr
         dataset = "simulated"
+        # loss_table_list = []
         
         save_path = config.MODEL_WEIGHT_BACKUP_PATH + "/" + model_name + "/"
         if not os.path.exists(save_path):
@@ -391,13 +403,15 @@ class MGN_NET(torch.nn.Module):
 
         for i in range(n_folds):
             print("********* FOLD {} *********".format(i))
+            
+            loss_table = []
                                     
             main_model = MGN_NET(dataset)
             main_model = main_model.to(device)
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
             model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
-            number_views = 4
+            number_views = config.number_of_views
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
             
@@ -520,5 +534,8 @@ class MGN_NET(torch.nn.Module):
                 helper.show_image(cbt, i, j)
                 
                 print("FINAL RESULTS  Client {}  REP: {}  KL: {}".format(j, rep_loss, kl_loss))
-            
+                
+                loss_table.append((rep_loss, kl_loss))
+            loss_table_list.append(loss_table)
+        # helper.plot_loss(loss_table_list)
         return models

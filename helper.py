@@ -5,6 +5,7 @@ import numpy as np
 import scipy.io
 import os
 import matplotlib.pyplot as plt
+import config
 
 #set seed for reproducibility
 torch.manual_seed(35813)
@@ -230,4 +231,70 @@ def load_input_from_dir_of_mats(dir_path):
     views = np.asarray(views)
     if not os.path.exists("input"):
             os.makedirs("input")
-    np.save("input/" + "dataset", views)        
+    np.save("input/" + "dataset", views)
+
+
+def plot_loss(loss_table_list):
+    for loss_table in loss_table_list:
+        for (rep_loss, kl_loss) in loss_table:
+            print("FINAL RESULTS  Client {}  REP: {}  KL: {}".format(0, rep_loss, kl_loss))
+            
+def plotLosses(loss_table_list1, loss_table_list2):
+    '''
+    This function plots every model's every fold's loss performance and saves them with their particular information written with their names.
+    '''
+    for i in range(config.number_of_folds):
+        print("fold " + str(i))
+        cur_loss_table_non_fed = loss_table_list1[i]
+        cur_loss_table_fed = loss_table_list2[i]
+
+        # rep_loss
+        labels = ["Client " + str(i) for i in range(config.number_of_clients)]
+        
+        
+        non_fed_rep = [rep_loss.item() for (rep_loss,_) in cur_loss_table_non_fed]
+        fed_rep = [rep_loss.item() for (rep_loss,_) in cur_loss_table_fed]
+
+        x = np.arange(len(labels))  # the label locations
+        width = 0.35  # the width of the bars
+
+        fig, ax = plt.subplots()
+        rects1 = ax.bar(x - width/2, non_fed_rep, width, label='Without federation')
+        rects2 = ax.bar(x + width/2, fed_rep, width, label='With federation')
+
+        # Add some text for labels, title and custom x-axis tick labels, etc.
+        ax.set_ylabel('Rep lost')
+        ax.set_title('Fold ' + str(i) + " lost comparison")
+        ax.set_xticks(x, labels)
+        ax.legend()
+
+        ax.bar_label(rects1, padding=3)
+        ax.bar_label(rects2, padding=3)
+
+        fig.tight_layout()
+
+        plt.show()
+        
+        
+        non_fed_kl = [kl_loss for (_,kl_loss) in cur_loss_table_non_fed]
+        fed_kl = [kl_loss for (_,kl_loss) in cur_loss_table_fed]
+
+        x = np.arange(len(labels))  # the label locations
+        width = 0.35  # the width of the bars
+
+        fig, ax = plt.subplots()
+        rects1 = ax.bar(x - width/2, non_fed_kl, width, label='Without federation')
+        rects2 = ax.bar(x + width/2, fed_kl, width, label='With federation')
+
+        # Add some text for labels, title and custom x-axis tick labels, etc.
+        ax.set_ylabel('KL lost')
+        ax.set_title('Fold ' + str(i) + " lost comparison")
+        ax.set_xticks(x, labels)
+        ax.legend()
+
+        ax.bar_label(rects1, padding=3)
+        ax.bar_label(rects2, padding=3)
+
+        fig.tight_layout()
+
+        plt.show()
