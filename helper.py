@@ -289,3 +289,24 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
         fig.tight_layout()
         plt.savefig("output/Loss_images/Fold " + str(i) + "/KL")
         # plt.show()
+        
+        # overall loss
+        non_fed_overall = [kl_loss * config.PARAMS["lambda_kl"] + rep_loss for (rep_loss,kl_loss) in cur_loss_table_non_fed]
+        fed_overall = [kl_loss * config.PARAMS["lambda_kl"] + rep_loss for (rep_loss,kl_loss) in cur_loss_table_fed]
+        x = np.arange(len(labels))  # the label locations
+        width = 0.35  # the width of the bars
+        fig, ax = plt.subplots()
+        rects1 = ax.bar(x - width/2, non_fed_overall, width, label='Without federation')
+        rects2 = ax.bar(x + width/2, fed_overall, width, label='With federation')
+        # Add some text for labels, title and custom x-axis tick labels, etc.
+        ax.set_ylabel('Overall lost')
+        ax.set_title('Fold ' + str(i) + " lost comparison")
+        ax.set_xticks(x, labels)
+        ax.legend()
+        ax.bar_label(rects1, padding=3)
+        ax.bar_label(rects2, padding=3)
+        fig.tight_layout()
+        plt.savefig("output/Loss_images/Fold " + str(i) + "/Overall")
+        # plt.show()
+        
+        

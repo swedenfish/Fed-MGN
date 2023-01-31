@@ -8,7 +8,7 @@ import numpy as np
 # Load dataset from MAT files
 # helper.clear_dir("input")
 # helper.load_input_from_dir_of_mats("data_nc_asd_L\ASD LH")
-
+print("********* Without federation *********")
 loss_list_non_fed = []
 MGN_NET.train_model(n_max_epochs = config.n_max_epochs, 
                         data_path = config.DATASET_PATH, 
@@ -18,6 +18,7 @@ MGN_NET.train_model(n_max_epochs = config.n_max_epochs,
                         fed = False,
                         loss_table_list = loss_list_non_fed)
 
+print("********* With federation *********")
 # Reset all the seeds to make sure identicial conditions
 torch.manual_seed(35813)
 np.random.seed(35813)
