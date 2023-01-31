@@ -150,18 +150,18 @@ class MGN_NET(torch.nn.Module):
 
                 model_dict[i].conv1.nn[0].weight.data = main_model.conv1.nn[0].weight.data.clone()
                 model_dict[i].conv1.nn[0].bias.data = main_model.conv1.nn[0].bias.data.clone()
-                model_dict[i].conv1.bias.data = main_model.conv1.bias.data.clone() 
-                # model_dict[i].conv1.lin = copy.deepcopy(main_model.conv1.lin)
-
+                model_dict[i].conv1.bias.data = main_model.conv1.bias.data.clone()
+                model_dict[i].conv1.lin.weight.data = main_model.conv1.lin.weight.data.clone()
+                
                 model_dict[i].conv2.nn[0].weight.data = main_model.conv2.nn[0].weight.data.clone()
                 model_dict[i].conv2.nn[0].bias.data = main_model.conv2.nn[0].bias.data.clone()
                 model_dict[i].conv2.bias.data = main_model.conv2.bias.data.clone() 
-                # model_dict[i].conv2.lin = copy.deepcopy(main_model.conv2.lin)
+                model_dict[i].conv2.lin.weight.data = main_model.conv2.lin.weight.data.clone()
                 
                 model_dict[i].conv3.nn[0].weight.data = main_model.conv3.nn[0].weight.data.clone()
                 model_dict[i].conv3.nn[0].bias.data = main_model.conv3.nn[0].bias.data.clone()
                 model_dict[i].conv3.bias.data = main_model.conv3.bias.data.clone() 
-                # model_dict[i].conv3.lin = copy.deepcopy(main_model.conv3.lin) 
+                model_dict[i].conv3.lin.weight.data = main_model.conv3.lin.weight.data.clone()
                 
         return model_dict
     
@@ -171,9 +171,9 @@ class MGN_NET(torch.nn.Module):
         '''
         This function takes combined weights for global model and assigns them to the global model.
         '''
-        conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root, \
-        conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root, \
-        conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root = MGN_NET.get_averaged_weights(model_dict, \
+        conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
+        conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
+        conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
                                                         number_of_samples, clients_with_access, \
                                                         average_all, last_updated_dict, current_epoch)
         
@@ -181,17 +181,17 @@ class MGN_NET(torch.nn.Module):
             main_model.conv1.nn[0].weight.data = conv1_nn_mean_weight.clone()
             main_model.conv1.nn[0].bias.data = conv1_nn_mean_bias.clone()
             main_model.conv1.bias.data = conv1_bias.clone()
-            # main_model.conv1.lin = copy.deepcopy(conv1_root)
+            main_model.conv1.lin.weight.data = conv1_root_weight.clone()
             
             main_model.conv2.nn[0].weight.data = conv2_nn_mean_weight.clone()
             main_model.conv2.nn[0].bias.data = conv2_nn_mean_bias.clone()
             main_model.conv2.bias.data = conv2_bias.clone()
-            # main_model.conv2.lin = conv2_root.clone()
+            main_model.conv2.lin.weight.data = conv2_root_weight.clone()
             
             main_model.conv3.nn[0].weight.data = conv3_nn_mean_weight.clone()
             main_model.conv3.nn[0].bias.data = conv3_nn_mean_bias.clone()
             main_model.conv3.bias.data = conv3_bias.clone()
-            # main_model.conv3.lin = conv3_root.clone()
+            main_model.conv3.lin.weight.data = conv3_root_weight.clone()
 
         return main_model
 
@@ -208,17 +208,20 @@ class MGN_NET(torch.nn.Module):
         conv1_nn_mean_weight = torch.zeros(size=model_dict[0].conv1.nn[0].weight.data.shape).to(device)
         conv1_nn_mean_bias = torch.zeros(size=model_dict[0].conv1.nn[0].bias.data.shape).to(device)
         conv1_bias = torch.zeros(size=model_dict[0].conv1.bias.data.shape).to(device)
-        conv1_root = torch.zeros(size_1[1], size_1[0]).to(device)
+        conv1_root_weight = torch.zeros(size=model_dict[0].conv1.lin.weight.data.shape).to(device)
+        conv1_root_bias = 0
         
         conv2_nn_mean_weight = torch.zeros(size=model_dict[0].conv2.nn[0].weight.data.shape).to(device)
         conv2_nn_mean_bias = torch.zeros(size=model_dict[0].conv2.nn[0].bias.data.shape).to(device)
         conv2_bias = torch.zeros(size=model_dict[0].conv2.bias.data.shape).to(device)
-        conv2_root = torch.zeros(size_2[1], size_2[0]).to(device)    
+        conv2_root_weight = torch.zeros(size=model_dict[0].conv2.lin.weight.data.shape).to(device)
+        conv2_root_bias = 0
         
         conv3_nn_mean_weight = torch.zeros(size=model_dict[0].conv3.nn[0].weight.data.shape).to(device)
         conv3_nn_mean_bias = torch.zeros(size=model_dict[0].conv3.nn[0].bias.data.shape).to(device)
         conv3_bias = torch.zeros(size=model_dict[0].conv3.bias.data.shape).to(device)
-        conv3_root = torch.zeros(size_3[1], size_3[0]).to(device)
+        conv3_root_weight = torch.zeros(size=model_dict[0].conv3.lin.weight.data.shape).to(device)
+        conv3_root_bias = 0
         
         cls = None # 
         if average_all:
@@ -239,22 +242,21 @@ class MGN_NET(torch.nn.Module):
                 conv1_nn_mean_weight += (client_weight * model_dict[i].conv1.nn[0].weight.data.clone())
                 conv1_nn_mean_bias += (client_weight * model_dict[i].conv1.nn[0].bias.data.clone())
                 conv1_bias += (client_weight * model_dict[i].conv1.bias.data.clone())
-                # conv1_root += (client_weight * copy.deepcopy(model_dict[i].conv1.lin))
-                # conv1_root += (client_weight * model_dict[i].conv1.lin.data.clone())
+                conv1_root_weight += (client_weight * model_dict[i].conv1.lin.weight.data.clone())
                 
                 conv2_nn_mean_weight += (client_weight * model_dict[i].conv2.nn[0].weight.data.clone())
                 conv2_nn_mean_bias += (client_weight * model_dict[i].conv2.nn[0].bias.data.clone())
                 conv2_bias += (client_weight * model_dict[i].conv2.bias.data.clone())
-                # conv2_root += (client_weight * copy.deepcopy(model_dict[i].conv2.lin).weight)
+                conv2_root_weight += (client_weight * model_dict[i].conv2.lin.weight.data.clone())
                 
                 conv3_nn_mean_weight += (client_weight * model_dict[i].conv3.nn[0].weight.data.clone())
                 conv3_nn_mean_bias += (client_weight * model_dict[i].conv3.nn[0].bias.data.clone())
                 conv3_bias += (client_weight * model_dict[i].conv3.bias.data.clone())
-                # conv3_root += (client_weight * copy.deepcopy(model_dict[i].conv3.lin).weight)
+                conv3_root_weight += (client_weight * model_dict[i].conv3.lin.weight.data.clone())
 
-        return conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root, \
-                conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root, \
-                conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root
+        return conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
+                conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
+                conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias
     
     @staticmethod
     def generate_subject_biased_cbts(model, train_data):
@@ -458,7 +460,22 @@ class MGN_NET(torch.nn.Module):
                         target_probs4 = target_dist4 / target_dist4.sum()
                         kl_loss_4 = ((cbt_probs * torch.log2(cbt_probs/target_probs4)).sum().abs()) + ((target_probs4* torch.log2(target_probs4/cbt_probs)).sum().abs())
                         
-                        kl_loss = (kl_loss_1 + kl_loss_2 + kl_loss_3 + kl_loss_4)
+                        if number_views == 6:
+                            #View 5 target
+                            target_mean5 = sampled_targets[range(4,random_sample_size * number_views, number_views)].mean(axis = 0)
+                            target_dist5 = target_mean5.sum(axis = 1)
+                            target_probs5 = target_dist5 / target_dist5.sum()
+                            kl_loss_5 = ((cbt_probs * torch.log2(cbt_probs/target_probs5)).sum().abs()) + ((target_probs5* torch.log2(target_probs5/cbt_probs)).sum().abs())
+                            
+                            #View 6 target
+                            target_mean6 = sampled_targets[range(5,random_sample_size * number_views, number_views)].mean(axis = 0)
+                            target_dist6 = target_mean6.sum(axis = 1)
+                            target_probs6 = target_dist6 / target_dist6.sum()
+                            kl_loss_6 = ((cbt_probs * torch.log2(cbt_probs/target_probs6)).sum().abs()) + ((target_probs6* torch.log2(target_probs6/cbt_probs)).sum().abs())
+                        else:
+                            kl_loss_5 = 0
+                            kl_loss_6 = 0
+                        kl_loss = (kl_loss_1 + kl_loss_2 + kl_loss_3 + kl_loss_4 + kl_loss_5 + kl_loss_6)
                         rep_loss = (l * loss_weightes[:random_sample_size * n_attr]).mean()
                         losses.append(kl_loss * model_params["lambda_kl"] + rep_loss)
                         
@@ -476,14 +493,14 @@ class MGN_NET(torch.nn.Module):
                         test_errors_rep = test_errors_rep_dict[j]
                         cbt = MGN_NET.generate_cbt_median(model, train_casted)
                         rep_loss = MGN_NET.mean_frobenious_distance(cbt, test_casted)
-                        kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, test_casted, six_views= True if dataset == "nc_asd" else False)
+                        kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, test_casted, six_views = (number_views==6))
                         tock = time.time()
                         time_elapsed = tock - tick
                         rep_loss = float(rep_loss)
                         test_errors_rep.append(rep_loss)
 
                         print("Epoch: {}  |  Client: {}  |  {} Rep: {:.2f}  |  KL: {:.2f} | Time Elapsed: {:.2f}  |".format(epoch, j,
-                            data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4) * model_params["lambda_kl"], time_elapsed))
+                            data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4+kl5+kl6), time_elapsed))
                         try:
                             #Early stopping and restoring logic
                             torch.save(model.state_dict(), "./temp/weight_" + model_id + "_" + str(rep_loss)[:5]  + ".model")
@@ -521,7 +538,7 @@ class MGN_NET(torch.nn.Module):
                 
                 cbt = MGN_NET.generate_cbt_median(model, train_casted)
                 rep_loss = MGN_NET.mean_frobenious_distance(cbt, test_casted)
-                kl_loss = float(sum(MGN_NET.KL_error(cbt, test_casted)))
+                kl_loss = float(sum(MGN_NET.KL_error(cbt, test_casted, number_views==6)))
                 cbt = cbt.cpu().numpy()
                 np.save( save_path + "fold" + str(i) + " client" + str(j) + "_cbt", cbt)
                 all_cbts = MGN_NET.generate_subject_biased_cbts(model, train_casted)
