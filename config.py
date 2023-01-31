@@ -3,7 +3,7 @@ RANDOM_SEED = 35813
 
 #Some important paths
 DATASET_PATH = "./simulated_dataset/example.npy"
-
+# DATASET_PATH = "./input/dataset.npy"
 
 MODEL_WEIGHT_BACKUP_PATH = "./output/model_weights"
 DEEP_CBT_SAVE_PATH = "./output/deep_cbts"

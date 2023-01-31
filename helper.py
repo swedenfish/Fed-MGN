@@ -215,3 +215,19 @@ def show_image(img, i, k):
 def clear_dir(dir_name):
     for file in os.listdir(dir_name):
         os.remove(os.path.join(dir_name, file))
+        
+
+# Load views from a directory with many mat files. Each mat file is a patient's dictionary, containing a ndarray-type view with shape of (35,35,6)
+# dir_path should be relative
+def load_input_from_dir_of_mats(dir_path):
+    views = []
+    for file_name in os.listdir(dir_path):
+        file_path = os.path.join(dir_path, file_name)
+        dict = scipy.io.loadmat(file_path)
+        view = dict["views"]
+        # np.append(views, view)
+        views.append(view)
+    views = np.asarray(views)
+    if not os.path.exists("input"):
+            os.makedirs("input")
+    np.save("input/" + "dataset", views)        
