@@ -6,6 +6,7 @@ import scipy.io
 import os
 import matplotlib.pyplot as plt
 import config
+import shutil
 
 #set seed for reproducibility
 torch.manual_seed(35813)
@@ -199,7 +200,7 @@ def cast_data(array_of_tensors, subject_type = None, flat_mask = None):
     return dataset
 
 
-def show_image(img, i, k):
+def save_cbt(img, i, k):
     #Fold i and Client k
     img = np.repeat(np.repeat(img, 10, axis=1), 10, axis=0)
     plt.imshow(img)
@@ -210,6 +211,7 @@ def show_image(img, i, k):
     if not os.path.exists('output/' + "CBT_images" + '/' + "Fold " + str(i)):
         os.mkdir('output/' + "CBT_images" + '/' + "Fold " + str(i))
     plt.savefig('output/' + "CBT_images" + '/' + "Fold " + str(i) + "/" + "Client " + str(k) ,bbox_inches='tight')
+    plt.close()
     
     
 #Clears the given directory
@@ -234,67 +236,56 @@ def load_input_from_dir_of_mats(dir_path):
     np.save("input/" + "dataset", views)
 
 
-def plot_loss(loss_table_list):
-    for loss_table in loss_table_list:
-        for (rep_loss, kl_loss) in loss_table:
-            print("FINAL RESULTS  Client {}  REP: {}  KL: {}".format(0, rep_loss, kl_loss))
-            
-def plotLosses(loss_table_list1, loss_table_list2):
+def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
     '''
     This function plots every model's every fold's loss performance and saves them with their particular information written with their names.
     '''
+    if not os.path.exists("output/Loss_images"):
+        os.makedirs("output/Loss_images")
+    shutil.rmtree('output/' + "Loss_images")
+    
     for i in range(config.number_of_folds):
-        print("fold " + str(i))
-        cur_loss_table_non_fed = loss_table_list1[i]
-        cur_loss_table_fed = loss_table_list2[i]
-
-        # rep_loss
+        os.makedirs("output/Loss_images/Fold " + str(i))
+        cur_loss_table_non_fed = loss_table_list_non_fed[i]
+        cur_loss_table_fed = loss_table_list_fed[i]
         labels = ["Client " + str(i) for i in range(config.number_of_clients)]
         
-        
+        # rep_loss
         non_fed_rep = [rep_loss.item() for (rep_loss,_) in cur_loss_table_non_fed]
         fed_rep = [rep_loss.item() for (rep_loss,_) in cur_loss_table_fed]
 
         x = np.arange(len(labels))  # the label locations
         width = 0.35  # the width of the bars
-
         fig, ax = plt.subplots()
         rects1 = ax.bar(x - width/2, non_fed_rep, width, label='Without federation')
         rects2 = ax.bar(x + width/2, fed_rep, width, label='With federation')
-
         # Add some text for labels, title and custom x-axis tick labels, etc.
         ax.set_ylabel('Rep lost')
         ax.set_title('Fold ' + str(i) + " lost comparison")
         ax.set_xticks(x, labels)
         ax.legend()
-
         ax.bar_label(rects1, padding=3)
         ax.bar_label(rects2, padding=3)
-
         fig.tight_layout()
-
-        plt.show()
+        plt.savefig("output/Loss_images/Fold " + str(i) + "/Rep")
+        # plt.show()
         
-        
+        # kl loss
         non_fed_kl = [kl_loss for (_,kl_loss) in cur_loss_table_non_fed]
         fed_kl = [kl_loss for (_,kl_loss) in cur_loss_table_fed]
 
         x = np.arange(len(labels))  # the label locations
         width = 0.35  # the width of the bars
-
         fig, ax = plt.subplots()
         rects1 = ax.bar(x - width/2, non_fed_kl, width, label='Without federation')
         rects2 = ax.bar(x + width/2, fed_kl, width, label='With federation')
-
         # Add some text for labels, title and custom x-axis tick labels, etc.
         ax.set_ylabel('KL lost')
         ax.set_title('Fold ' + str(i) + " lost comparison")
         ax.set_xticks(x, labels)
         ax.legend()
-
         ax.bar_label(rects1, padding=3)
         ax.bar_label(rects2, padding=3)
-
         fig.tight_layout()
-
-        plt.show()
+        plt.savefig("output/Loss_images/Fold " + str(i) + "/KL")
+        # plt.show()

@@ -88,7 +88,6 @@ class MGN_NET(torch.nn.Module):
         elif(n_folds == 1):
             all_data = np.load(data_path)
             length = all_data.shape[0]
-            print(length)
             all_train_data = all_data[:round(length*0.8)]
             test_data = all_data[round(length*0.8):]
         else:
@@ -385,7 +384,6 @@ class MGN_NET(torch.nn.Module):
         models = []
         n_attr = config.Nattr
         dataset = "simulated"
-        # loss_table_list = []
         
         save_path = config.MODEL_WEIGHT_BACKUP_PATH + "/" + model_name + "/"
         if not os.path.exists(save_path):
@@ -403,9 +401,7 @@ class MGN_NET(torch.nn.Module):
 
         for i in range(n_folds):
             print("********* FOLD {} *********".format(i))
-            
             loss_table = []
-                                    
             main_model = MGN_NET(dataset)
             main_model = main_model.to(device)
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
@@ -530,12 +526,10 @@ class MGN_NET(torch.nn.Module):
                 np.save( save_path + "fold" + str(i) + " client" + str(j) + "_cbt", cbt)
                 all_cbts = MGN_NET.generate_subject_biased_cbts(model, train_casted)
                 np.save(save_path + "fold" + str(i) + " client" + str(j) + "_all_cbts", all_cbts)
-                
-                helper.show_image(cbt, i, j)
+                helper.save_cbt(cbt, i, j)
                 
                 print("FINAL RESULTS  Client {}  REP: {}  KL: {}".format(j, rep_loss, kl_loss))
                 
                 loss_table.append((rep_loss, kl_loss))
             loss_table_list.append(loss_table)
-        # helper.plot_loss(loss_table_list)
         return models
