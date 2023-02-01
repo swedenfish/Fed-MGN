@@ -10,12 +10,12 @@ DEEP_CBT_SAVE_PATH = "./output/deep_cbts"
 TEMP_FOLDER = "./temp"
 
 #Control variables
-number_of_clients = 2
-fed = False
+number_of_clients = 3
+# fed = False
 early_stop_rounds = 3
 n_max_epochs = 100
 early_stop = True
-number_of_folds = 2
+number_of_folds = 3
 
 temporal_weighting = False
 average_all = True

@@ -8,6 +8,8 @@ import numpy as np
 # Load dataset from MAT files
 # helper.clear_dir("input")
 # helper.load_input_from_dir_of_mats("data_nc_asd_L\ASD LH")
+
+helper.clear_output()
 print("********* Without federation *********")
 loss_list_non_fed = []
 MGN_NET.train_model(n_max_epochs = config.n_max_epochs, 

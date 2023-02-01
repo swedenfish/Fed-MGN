@@ -13,6 +13,7 @@ from torch_geometric.nn import NNConv
 import time
 import sys
 from torch.nn import Sequential, Linear, ReLU
+from sklearn.cluster import KMeans
 
 #set seed for reproducibility
 torch.manual_seed(35813)
@@ -84,9 +85,9 @@ class MGN_NET(torch.nn.Module):
         if(n_folds > 1):
             all_train_data, test_data, _, _ = helper.preprocess_data_array(data_path,
                                 number_of_folds=n_folds, current_fold_id=i)
-        #TODO
         elif(n_folds == 1):
             all_data = np.load(data_path)
+            np.random.shuffle(all_data)
             length = all_data.shape[0]
             all_train_data = all_data[:round(length*0.8)]
             test_data = all_data[round(length*0.8):]
@@ -102,14 +103,14 @@ class MGN_NET(torch.nn.Module):
         loss_weightes_dict = []
         optimizer_dict = []
         test_errors_rep_dict = []
-                
+        
+        
         for n in range(number_of_clients):
             
             model = MGN_NET(dataset)
             model = model.to(device)
             model_dict.append(model)
             
-            #TODO: shuffle all train data
             size = number_of_data // number_of_clients 
             if(n==number_of_clients-1):
                 train_data = all_train_data[n*size:]
@@ -120,6 +121,8 @@ class MGN_NET(torch.nn.Module):
             train_casted = [d.to(device) for d in helper.cast_data(train_data)]
             train_casted_dict.append(train_casted)
             
+            # each client's targets are just all its train data
+            # will randomly choose subset of it to evaluate loss
             targets =  [torch.tensor(tensor, dtype = torch.float32).to(device) for tensor in train_data]
             targets_dict.append(targets)
 
@@ -139,6 +142,90 @@ class MGN_NET(torch.nn.Module):
         test_casted = [d.to(device) for d in helper.cast_data(test_data)]
         return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted)
     
+    
+    # Not used
+    def prepare_client_dicts_using_clusters(data_path, n_folds, i, weighted_loss):
+        """
+            Very similar to prepare_client_dicts, but use a k-means cluster algorithm to decide global test set and each client's train_data
+            Prepare all dicts used for multiple clients to train their models
+            Args:
+                data_path (string): file path for the dataset 
+                n_folds (int): number of cross validation folds
+                i (int): current fold index
+                weighted_loss (bool): view normalization in centeredness loss
+            Return:
+                models: trained models 
+        """
+        n_attr = config.Nattr
+        dataset = "simulated"
+        model_params = config.PARAMS
+            
+        model_dict = []
+        train_data_dict = []
+        train_casted_dict = []
+        targets_dict = []    
+        loss_weightes_dict = []
+        optimizer_dict = []
+        test_errors_rep_dict = []
+        
+        if(n_folds == 1):
+            all_data = np.load(data_path)
+            length = all_data.shape[0]
+            train_data_dict.append(all_data[:round(length*0.8)])
+            test_data = all_data[round(length*0.8):]
+        elif(n_folds > 1):
+            #TODO
+            (train_data_dict, test_data) = MGN_NET.k_mean_clustering()
+        else:
+            print("n_folds error: " + n_folds)
+                
+                
+        # train_data_dict and test_data should be ready till here        
+        for n in range(number_of_clients):
+            
+            model = MGN_NET(dataset)
+            model = model.to(device)
+            model_dict.append(model)
+            
+            train_data = train_data_dict[n]
+            train_casted = [d.to(device) for d in helper.cast_data(train_data)]
+            train_casted_dict.append(train_casted)
+            
+            # each client's targets are just all its train data
+            # will randomly choose subset of it to evaluate loss
+            targets =  [torch.tensor(tensor, dtype = torch.float32).to(device) for tensor in train_data]
+            targets_dict.append(targets)
+
+            train_mean = np.mean(train_data, axis=(0,1,2))
+            if weighted_loss:
+                loss_weightes = torch.tensor(np.array(list((1 / train_mean) / np.max(1 / train_mean))*len(train_data)), dtype = torch.float32)
+            else:
+                loss_weightes =  torch.tensor(np.ones((n_attr*len(train_data))), dtype = torch.float32)
+            loss_weightes = loss_weightes.to(device)
+            loss_weightes_dict.append(loss_weightes)
+            
+            optimizer = torch.optim.AdamW(model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
+            optimizer_dict.append(optimizer)
+            
+            test_errors_rep = []
+            test_errors_rep_dict.append(test_errors_rep)
+        test_casted = [d.to(device) for d in helper.cast_data(test_data)]
+        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted)
+    
+    #TODO Not used
+    def k_mean_clustering():
+        return 
+    
+    
+    def simulate_dataset_using_clustering(data_path, number_of_folds, number_of_clients):
+        """
+        This function acts as a preprocessing function before doing training
+        Accepts a dataset.npy representing all data, and split it to k folds.
+        Each fold will then be split into n clusters using k-means, which simulates data in n clients
+        20% of each clusters will be taken out and mix together as a global testset
+        """
+        all_data = np.load(data_path)
+        
     def send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
                                                    number_of_samples, clients_with_access):
         '''
@@ -396,7 +483,7 @@ class MGN_NET(torch.nn.Module):
             os.mkdir('output/' + "CBT_images")
         helper.clear_dir("temp")
         helper.clear_dir(save_path)
-        shutil.rmtree('output/' + "CBT_images")
+        
             
         model_id = str(uuid.uuid4())
         model_params = config.PARAMS
@@ -409,6 +496,7 @@ class MGN_NET(torch.nn.Module):
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
             model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
+            print(str(len(train_casted_dict[0])) + " train_data")
             number_views = config.number_of_views
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
@@ -543,7 +631,7 @@ class MGN_NET(torch.nn.Module):
                 np.save( save_path + "fold" + str(i) + " client" + str(j) + "_cbt", cbt)
                 all_cbts = MGN_NET.generate_subject_biased_cbts(model, train_casted)
                 np.save(save_path + "fold" + str(i) + " client" + str(j) + "_all_cbts", all_cbts)
-                helper.save_cbt(cbt, i, j)
+                helper.save_cbt(cbt, i, j, fed)
                 
                 print("FINAL RESULTS  Client {}  REP: {}  KL: {}".format(j, rep_loss, kl_loss))
                 
