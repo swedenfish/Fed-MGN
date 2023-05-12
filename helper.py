@@ -140,6 +140,7 @@ def read_all_dataset(root, read_indices = None, connection_mask = None):
 
 def preprocess_data_array(data_path, number_of_folds, current_fold_id):
     X = np.load(data_path)
+    # print(np.shape(X))
     np.random.seed(35813)
     np.random.shuffle(X)
     kf = KFold(n_splits=number_of_folds)
@@ -289,14 +290,15 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
         rects1 = ax.bar(x - width/2, non_fed_rep, width, label='Without federation')
         rects2 = ax.bar(x + width/2, fed_rep, width, label='With federation')
         # Add some text for labels, title and custom x-axis tick labels, etc.
-        ax.set_ylabel('Rep lost')
-        ax.set_title('Fold ' + str(i) + " Rep lost comparison")
+        ax.set_ylabel('Rep loss')
+        ax.set_title('Fold ' + str(i) + " Rep loss comparison")
         ax.set_xticks(x, labels)
         ax.legend()
         ax.bar_label(rects1, padding=3)
         ax.bar_label(rects2, padding=3)
         fig.tight_layout()
         plt.savefig("output/Loss_images/Fold " + str(i) + "/Rep")
+        plt.close()
         # plt.show()
         
         # kl loss
@@ -310,14 +312,15 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
         rects1 = ax.bar(x - width/2, non_fed_kl, width, label='Without federation')
         rects2 = ax.bar(x + width/2, fed_kl, width, label='With federation')
         # Add some text for labels, title and custom x-axis tick labels, etc.
-        ax.set_ylabel('KL lost')
-        ax.set_title('Fold ' + str(i) + " KL lost comparison")
+        ax.set_ylabel('KL loss')
+        ax.set_title('Fold ' + str(i) + " KL loss comparison")
         ax.set_xticks(x, labels)
         ax.legend()
         ax.bar_label(rects1, padding=3)
         ax.bar_label(rects2, padding=3)
         fig.tight_layout()
         plt.savefig("output/Loss_images/Fold " + str(i) + "/KL")
+        plt.close()
         # plt.show()
         
         # overall loss
@@ -331,14 +334,15 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
         rects1 = ax.bar(x - width/2, non_fed_overall, width, label='Without federation')
         rects2 = ax.bar(x + width/2, fed_overall, width, label='With federation')
         # Add some text for labels, title and custom x-axis tick labels, etc.
-        ax.set_ylabel('Overall lost')
-        ax.set_title('Fold ' + str(i) + " overall lost comparison")
+        ax.set_ylabel('Overall loss')
+        ax.set_title('Fold ' + str(i) + " overall loss comparison")
         ax.set_xticks(x, labels)
         ax.legend()
         ax.bar_label(rects1, padding=3)
         ax.bar_label(rects2, padding=3)
         fig.tight_layout()
         plt.savefig("output/Loss_images/Fold " + str(i) + "/Overall")
+        plt.close()
         # plt.show()
         
     # Combining all folds
@@ -352,14 +356,15 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
     rects1 = ax.bar(x - width/2, non_fed_rep_average, width, label='Without federation')
     rects2 = ax.bar(x + width/2, fed_rep_averge, width, label='With federation')
     # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('Rep lost')
-    ax.set_title("Average Rep lost comparison")
+    ax.set_ylabel('Rep loss')
+    ax.set_title("Average Rep loss comparison")
     ax.set_xticks(x, labels)
     ax.legend()
     ax.bar_label(rects1, padding=3)
     ax.bar_label(rects2, padding=3)
     fig.tight_layout()
     plt.savefig("output/Loss_images/Average" + "/Rep")
+    plt.close()
     # plt.show()
     
     # kl loss
@@ -371,14 +376,15 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
     rects1 = ax.bar(x - width/2, non_fed_kl_average, width, label='Without federation')
     rects2 = ax.bar(x + width/2, fed_kl_average, width, label='With federation')
     # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('KL lost')
-    ax.set_title("Average KL lost comparison")
+    ax.set_ylabel('KL loss')
+    ax.set_title("Average KL loss comparison")
     ax.set_xticks(x, labels)
     ax.legend()
     ax.bar_label(rects1, padding=3)
     ax.bar_label(rects2, padding=3)
     fig.tight_layout()
     plt.savefig("output/Loss_images/Average" + "/KL")
+    plt.close()
     # plt.show()
     
     # overall loss
@@ -390,14 +396,15 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed):
     rects1 = ax.bar(x - width/2, non_fed_overall_average, width, label='Without federation')
     rects2 = ax.bar(x + width/2, fed_overall_average, width, label='With federation')
     # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('Overall lost')
-    ax.set_title("Average overall lost comparison")
+    ax.set_ylabel('Overall loss')
+    ax.set_title("Average overall loss comparison")
     ax.set_xticks(x, labels)
     ax.legend()
     ax.bar_label(rects1, padding=3)
     ax.bar_label(rects2, padding=3)
     fig.tight_layout()
     plt.savefig("output/Loss_images/Average" + "/Overall")
+    plt.close()
     # plt.show()
     
     
@@ -405,4 +412,46 @@ def clear_output():
     if not os.path.exists('output/' + "CBT_images"):
             os.mkdir('output/' + "CBT_images")
     shutil.rmtree('output/' + "CBT_images")
+
+def loss_compare_list_init(n_folds, n_clients, n_epochs):
+    return np.zeros((n_folds, n_clients, 2, n_epochs))
+
+def plotLossesCompare(list):
+    if not os.path.exists("output/Loss_Compare"):
+        os.makedirs("output/Loss_Compare")
+    shutil.rmtree('output/' + "Loss_Compare")
+    
+    for i in range(config.number_of_folds):
+        os.makedirs("output/Loss_Compare/Fold " + str(i))
+        for j in range(config.number_of_clients):
+            non_fed_losses = list[i][j][0]
+            try:
+                stop_index_non_fed = np.where(non_fed_losses == 0)[0][0]
+            except IndexError as e:
+                stop_index_non_fed = config.n_max_epochs
+                
+            non_fed_losses = non_fed_losses[0: stop_index_non_fed]
+            fed_losses = list[i][j][1]
+            try:
+                stop_index_fed = np.where(fed_losses == 0)[0][0]
+            except IndexError as e:
+                stop_index_fed = config.n_max_epochs
+            fed_losses = fed_losses[0: stop_index_fed]
+            
+            fig, ax = plt.subplots()
+            plt.xlabel("epochs")
+            plt.ylabel("loss")
+            
+            plt.title("Fold " + str(i) + " Client " + str(j) + " loss comparison")
+            
+            
+            assert stop_index_non_fed == stop_index_fed
+            x = range(0, stop_index_fed)
+            plt.plot(x, non_fed_losses, "x-", label = "non-fed")
+            plt.plot(x, fed_losses, "+-", label = "fed")
+            
+            plt.grid(True)
+            plt.legend(bbox_to_anchor = (1.0, 1), loc = 1, borderaxespad = 0.)
+            plt.savefig("output/Loss_Compare/Fold " + str(i) + "/Client " + str(j))
+            plt.close()
     

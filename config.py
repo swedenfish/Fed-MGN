@@ -12,10 +12,11 @@ TEMP_FOLDER = "./temp"
 #Control variables
 number_of_clients = 3
 # fed = False
-early_stop_rounds = 3
+early_stop_rounds = 10
 n_max_epochs = 100
 early_stop = True
-number_of_folds = 3
+number_of_folds = 4
+update_freq = 1
 
 temporal_weighting = False
 average_all = True

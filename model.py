@@ -26,7 +26,7 @@ torch.backends.cudnn.benchmark = False
 #check if any gpu is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    
+
 class MGN_NET(torch.nn.Module):
     def __init__(self, dataset):
         super(MGN_NET, self).__init__()
@@ -85,6 +85,8 @@ class MGN_NET(torch.nn.Module):
         if(n_folds > 1):
             all_train_data, test_data, _, _ = helper.preprocess_data_array(data_path,
                                 number_of_folds=n_folds, current_fold_id=i)
+            # print(np.shape(all_train_data))
+            # print(np.shape(test_data))
         elif(n_folds == 1):
             all_data = np.load(data_path)
             np.random.shuffle(all_data)
@@ -225,7 +227,7 @@ class MGN_NET(torch.nn.Module):
         20% of each clusters will be taken out and mix together as a global testset
         """
         all_data = np.load(data_path)
-        
+      
     def send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
                                                    number_of_samples, clients_with_access):
         '''
@@ -432,8 +434,6 @@ class MGN_NET(torch.nn.Module):
             kl_5, kl_6 = 0, 0 
         return kl_1, kl_2, kl_3, kl_4, kl_5, kl_6
         
-                    
-    
     @staticmethod
     def mean_frobenious_distance(generated_cbt, test_data):
         """
@@ -454,7 +454,7 @@ class MGN_NET(torch.nn.Module):
         return sum(frobenius_all) / len(frobenius_all)
     
     @staticmethod
-    def train_model(n_max_epochs, data_path, early_stop, model_name, fed, loss_table_list, weighted_loss = True, random_sample_size_para = 10, n_folds = 5):
+    def train_model(n_max_epochs, data_path, early_stop, model_name, fed, loss_table_list, loss_compare, weighted_loss = True, random_sample_size_para = 10, n_folds = 5):
         """
             Trains a model for each cross validation fold and 
             saves all models along with CBTs to ./output/<model_name> 
@@ -491,6 +491,8 @@ class MGN_NET(torch.nn.Module):
         for i in range(n_folds):
             print("********* FOLD {} *********".format(i))
             loss_table = []
+            
+            # Main model in the sever
             main_model = MGN_NET(dataset)
             main_model = main_model.to(device)
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
@@ -503,6 +505,7 @@ class MGN_NET(torch.nn.Module):
             
             #Ready to start
             for epoch in range(n_max_epochs):
+                # Each client trains its model locally
                 for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                     model = model_dict[j]
                     model.train()
@@ -569,9 +572,25 @@ class MGN_NET(torch.nn.Module):
                         
                     optimizer.zero_grad()
                     loss = torch.mean(torch.stack(losses))
+                    if not fed:
+                        loss_compare[i][j][0][epoch] = loss
+                    else:
+                        loss_compare[i][j][1][epoch] = loss
                     loss.backward()
                     optimizer.step()
+                    
+                if fed and epoch % config.update_freq == 0:
+                    # update main models from all parameters received
+                    main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
+                                      model_dict, number_of_clients, \
+                                        list(range(0, number_of_clients)), None, epoch+1)           
                 
+                    # send models to all clients
+                    MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
+                                                                number_of_clients, list(range(0, number_of_clients)))
+                    
+                    print("main model updated, and send to all clients")
+                    
                 if epoch % 10 == 0:
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                         model = model_dict[j]
@@ -602,15 +621,7 @@ class MGN_NET(torch.nn.Module):
                             break
                     tick = tock
                 
-                if fed:
-                    # update main models from all parameters received
-                    main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
-                                      model_dict, number_of_clients, \
-                                        list(range(0, number_of_clients)), None, epoch+1)           
                 
-                    # send models to all clients
-                    MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
-                                                                number_of_clients, list(range(0, number_of_clients)))
                             
             for j in range(number_of_clients):
                 model = model_dict[j]

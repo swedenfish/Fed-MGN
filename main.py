@@ -6,19 +6,25 @@ import torch
 import numpy as np
 
 # Load dataset from MAT files
-# helper.clear_dir("input")
-# helper.load_input_from_dir_of_mats("data_nc_asd_L\ASD LH")
+helper.clear_dir("input")
+helper.load_input_from_dir_of_mats("data_nc_asd_L/NC LH")
 
 helper.clear_output()
+
+torch.manual_seed(35813)
+np.random.seed(35813)
+
 print("********* Without federation *********")
 loss_list_non_fed = []
+loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
 MGN_NET.train_model(n_max_epochs = config.n_max_epochs, 
                         data_path = config.DATASET_PATH, 
                         early_stop = config.early_stop,
                         model_name = "MGN_NET",
                         n_folds = config.number_of_folds,
                         fed = False,
-                        loss_table_list = loss_list_non_fed)
+                        loss_table_list = loss_list_non_fed,
+                        loss_compare = loss_compare_list)
 
 print("********* With federation *********")
 # Reset all the seeds to make sure identicial conditions
@@ -31,6 +37,8 @@ MGN_NET.train_model(n_max_epochs = config.n_max_epochs,
                         model_name = "MGN_NET",
                         n_folds = config.number_of_folds,
                         fed = True,
-                        loss_table_list = loss_list_fed)
+                        loss_table_list = loss_list_fed,
+                        loss_compare = loss_compare_list)
 
 helper.plotLosses(loss_list_non_fed, loss_list_fed)
+helper.plotLossesCompare(loss_compare_list)
