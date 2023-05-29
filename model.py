@@ -34,6 +34,8 @@ class MGN_NET(torch.nn.Module):
         
         model_params = config.PARAMS
         
+        # nn is the non linear neural network layer after message passing
+        # so each node with 6 attributes -> 36 attributes as representation
         nn = Sequential(Linear(model_params["Linear1"]["in"], model_params["Linear1"]["out"]), ReLU())
         self.conv1 = NNConv(model_params["conv1"]["in"], model_params["conv1"]["out"], nn, aggr='mean')
         
@@ -43,6 +45,17 @@ class MGN_NET(torch.nn.Module):
         nn = Sequential(Linear(model_params["Linear3"]["in"], model_params["Linear3"]["out"]), ReLU())
         self.conv3 = NNConv(model_params["conv3"]["in"], model_params["conv3"]["out"], nn, aggr='mean')
         
+        # nn = Sequential(Linear(6, 36), ReLU())
+        # self.conv1 = NNConv(1, 36, nn, aggr='mean')
+        
+        # nn = Sequential(Linear(6, 36*24), ReLU())
+        # self.conv2 = NNConv(36, 24, nn, aggr='mean')
+        
+        # nn = Sequential(Linear(6, 24*8), ReLU())
+        # self.conv3 = NNConv(24, 8, nn, aggr='mean')
+        
+        # Size of each sample
+        # 1 -> 36 -> 24 -> 8
         
     def forward(self, data):
         """
@@ -256,6 +269,24 @@ class MGN_NET(torch.nn.Module):
                 
         return model_dict
     
+    def cal_weight_diff(main_model, model):
+        """
+        This function calculates the weight difference between global model and client mode in order to calculate the proximal loss
+        """
+        client_model = model
+        diff_sum = 0
+        diff_sum += torch.sum(torch.abs(client_model.conv1.nn[0].weight.data.clone() - main_model.conv1.nn[0].weight.data.clone()))
+        diff_sum += torch.sum(torch.abs(client_model.conv2.nn[0].weight.data.clone() - main_model.conv2.nn[0].weight.data.clone()))
+        diff_sum += torch.sum(torch.abs(client_model.conv3.nn[0].weight.data.clone() - main_model.conv3.nn[0].weight.data.clone()))
+        
+        diff_sum += torch.sum(torch.abs(client_model.conv1.lin.weight.data.clone() - main_model.conv1.lin.weight.data.clone()))
+        diff_sum += torch.sum(torch.abs(client_model.conv2.lin.weight.data.clone() - main_model.conv2.lin.weight.data.clone()))
+        diff_sum += torch.sum(torch.abs(client_model.conv3.lin.weight.data.clone() - main_model.conv3.lin.weight.data.clone()))
+        
+        return diff_sum
+        
+        
+        
     def set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, model_dict, \
                                                                      number_of_samples, clients_with_access, \
                                                                     last_updated_dict, current_epoch):
@@ -531,7 +562,6 @@ class MGN_NET(torch.nn.Module):
                     loss_weightes = loss_weightes_dict[j]
                     optimizer = optimizer_dict[j]
                     
-                        
                     for data in train_casted:
                         cbt = model(data)
                         views_sampled = random.sample(targets, random_sample_size)
@@ -591,7 +621,6 @@ class MGN_NET(torch.nn.Module):
                         
                     optimizer.zero_grad()
                     loss = torch.mean(torch.stack(losses))
-                    #TODO add proximal term
                     kl_loss = torch.mean(torch.stack(kl_losses))
                     rep_loss = torch.mean(torch.stack(rep_losses))
                     if not fed:
@@ -610,6 +639,10 @@ class MGN_NET(torch.nn.Module):
                         loss_vs_epoch[i][j][3][epoch] = loss
                         rep_vs_epoch[i][j][3][epoch] = rep_loss
                         kl_vs_epoch[i][j][3][epoch] = kl_loss
+                    #TODO add proximal term
+                    if fed:
+                        weight_diff = MGN_NET.cal_weight_diff(main_model, model)
+                        loss += config.mu * 0.5 * (weight_diff * weight_diff)
                     loss.backward()
                     optimizer.step()
                     

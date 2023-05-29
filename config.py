@@ -13,14 +13,16 @@ TEMP_FOLDER = "./temp"
 number_of_clients = 3
 # fed = False
 early_stop_rounds = 4
-early_stop_distance = 0.5
-early_stop_interval = 35
+early_stop_distance = 1
+early_stop_interval = 50
 n_max_epochs = 500
 early_stop = True
 number_of_folds = 4
 # update_freq = 1
 
 temporal_weighting = False
+
+mu = 10
 
 # Normalize views when calculating rep loss to avoid overfitting large-number views
 weighted_loss = True
@@ -34,11 +36,17 @@ N_ROIs = 35
 N_RANDOM_SAMPLES = 10
 
 #Model hyperparams
+#Following config_real_dataset
 Nattr = number_of_views
 CONV1 = 36
 CONV2 = 24
-CONV3 = 5
-lambda_kl = 25
+CONV3 = 8
+lambda_kl = 10
+# CONV1 = 36
+# CONV2 = 24
+# CONV3 = 5
+# lambda_kl = 25
+
 
 PARAMS = {
             "learning_rate" : 0.0006,
