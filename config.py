@@ -12,13 +12,18 @@ TEMP_FOLDER = "./temp"
 #Control variables
 number_of_clients = 3
 # fed = False
-early_stop_rounds = 10
-n_max_epochs = 100
+early_stop_rounds = 4
+early_stop_distance = 0.5
+early_stop_interval = 35
+n_max_epochs = 500
 early_stop = True
 number_of_folds = 4
-update_freq = 1
+# update_freq = 1
 
 temporal_weighting = False
+
+# Normalize views when calculating rep loss to avoid overfitting large-number views
+weighted_loss = True
 average_all = True
 
 # Should be decided by input shape

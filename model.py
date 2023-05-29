@@ -18,6 +18,7 @@ from sklearn.cluster import KMeans
 #set seed for reproducibility
 torch.manual_seed(35813)
 np.random.seed(35813)
+random.seed(35813)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
@@ -129,6 +130,7 @@ class MGN_NET(torch.nn.Module):
             targets_dict.append(targets)
 
             train_mean = np.mean(train_data, axis=(0,1,2))
+            #whether rep loss should be calculated with normalised views weight
             if weighted_loss:
                 loss_weightes = torch.tensor(np.array(list((1 / train_mean) / np.max(1 / train_mean))*len(train_data)), dtype = torch.float32)
             else:
@@ -237,20 +239,20 @@ class MGN_NET(torch.nn.Module):
         with torch.no_grad():
             for i in range(number_of_samples): # clients_with_access 
 
-                model_dict[i].conv1.nn[0].weight.data = main_model.conv1.nn[0].weight.data.clone()
-                model_dict[i].conv1.nn[0].bias.data = main_model.conv1.nn[0].bias.data.clone()
-                model_dict[i].conv1.bias.data = main_model.conv1.bias.data.clone()
-                model_dict[i].conv1.lin.weight.data = main_model.conv1.lin.weight.data.clone()
+                model_dict[i].conv1.nn[0].weight.data = 0.5*(main_model.conv1.nn[0].weight.data.clone() + model_dict[i].conv1.nn[0].weight.data.clone())
+                model_dict[i].conv1.nn[0].bias.data = 0.5*(main_model.conv1.nn[0].bias.data.clone() + model_dict[i].conv1.nn[0].bias.data.clone())
+                model_dict[i].conv1.bias.data = 0.5*(main_model.conv1.bias.data.clone() + model_dict[i].conv1.bias.data.clone())
+                model_dict[i].conv1.lin.weight.data = 0.5*(main_model.conv1.lin.weight.data.clone() + model_dict[i].conv1.lin.weight.data.clone())
                 
-                model_dict[i].conv2.nn[0].weight.data = main_model.conv2.nn[0].weight.data.clone()
-                model_dict[i].conv2.nn[0].bias.data = main_model.conv2.nn[0].bias.data.clone()
-                model_dict[i].conv2.bias.data = main_model.conv2.bias.data.clone() 
-                model_dict[i].conv2.lin.weight.data = main_model.conv2.lin.weight.data.clone()
+                model_dict[i].conv2.nn[0].weight.data = 0.5*(main_model.conv2.nn[0].weight.data.clone() + model_dict[i].conv2.nn[0].weight.data.clone())
+                model_dict[i].conv2.nn[0].bias.data = 0.5*(main_model.conv2.nn[0].bias.data.clone() + model_dict[i].conv2.nn[0].bias.data.clone())
+                model_dict[i].conv2.bias.data = 0.5*(main_model.conv2.bias.data.clone() + model_dict[i].conv2.bias.data.clone())
+                model_dict[i].conv2.lin.weight.data = 0.5*(main_model.conv2.lin.weight.data.clone() + model_dict[i].conv2.lin.weight.data.clone())
                 
-                model_dict[i].conv3.nn[0].weight.data = main_model.conv3.nn[0].weight.data.clone()
-                model_dict[i].conv3.nn[0].bias.data = main_model.conv3.nn[0].bias.data.clone()
-                model_dict[i].conv3.bias.data = main_model.conv3.bias.data.clone() 
-                model_dict[i].conv3.lin.weight.data = main_model.conv3.lin.weight.data.clone()
+                model_dict[i].conv3.nn[0].weight.data = 0.5*(main_model.conv3.nn[0].weight.data.clone() + model_dict[i].conv3.nn[0].weight.data.clone())
+                model_dict[i].conv3.nn[0].bias.data = 0.5*(main_model.conv3.nn[0].bias.data.clone() + model_dict[i].conv3.nn[0].bias.data.clone())
+                model_dict[i].conv3.bias.data = 0.5*(main_model.conv3.bias.data.clone() + model_dict[i].conv3.bias.data.clone())
+                model_dict[i].conv3.lin.weight.data = 0.5*(main_model.conv3.lin.weight.data.clone() + model_dict[i].conv3.lin.weight.data.clone())
                 
         return model_dict
     
@@ -443,8 +445,10 @@ class MGN_NET(torch.nn.Module):
                 test_data: list of data objects
         """
         frobenius_all = []
+        # print(len(test_data)) 47 so didn't randomly choose?
         for data in test_data:
             views = data.con_mat
+            # views -> [35,35,6] simply the subject?
             for index in range(views.shape[2]):
                 diff = torch.abs(views[:,:,index] - generated_cbt)
                 diff = diff*diff
@@ -454,7 +458,7 @@ class MGN_NET(torch.nn.Module):
         return sum(frobenius_all) / len(frobenius_all)
     
     @staticmethod
-    def train_model(n_max_epochs, data_path, early_stop, model_name, fed, loss_table_list, loss_compare, weighted_loss = True, random_sample_size_para = 10, n_folds = 5):
+    def train_model(n_max_epochs, data_path, early_stop, model_name, fed, loss_table_list, loss_vs_epoch, rep_vs_epoch, kl_vs_epoch, weighted_loss = config.weighted_loss, random_sample_size_para = config.N_RANDOM_SAMPLES, n_folds = 5, update_freq = 1):
         """
             Trains a model for each cross validation fold and 
             saves all models along with CBTs to ./output/<model_name> 
@@ -490,6 +494,7 @@ class MGN_NET(torch.nn.Module):
 
         for i in range(n_folds):
             print("********* FOLD {} *********".format(i))
+            # Store each clients' final loss in this fold
             loss_table = []
             
             # Main model in the sever
@@ -505,17 +510,28 @@ class MGN_NET(torch.nn.Module):
             
             #Ready to start
             for epoch in range(n_max_epochs):
+                
+                if fed and epoch % update_freq == 0:
+                    # send models to all clients
+                    MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
+                                                                number_of_clients, list(range(0, number_of_clients)))
+                    
+                #     # print("main model updated, and send to all clients")
+                    
                 # Each client trains its model locally
                 for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                     model = model_dict[j]
                     model.train()
                     losses = []
+                    rep_losses = []
+                    kl_losses = []
                     train_casted = train_casted_dict[j]
                     targets = targets_dict[j]
                     random_sample_size = int(random_sample_size_para/number_of_clients)
                     loss_weightes = loss_weightes_dict[j]
                     optimizer = optimizer_dict[j]
                     
+                        
                     for data in train_casted:
                         cbt = model(data)
                         views_sampled = random.sample(targets, random_sample_size)
@@ -567,30 +583,49 @@ class MGN_NET(torch.nn.Module):
                             kl_loss_5 = 0
                             kl_loss_6 = 0
                         kl_loss = (kl_loss_1 + kl_loss_2 + kl_loss_3 + kl_loss_4 + kl_loss_5 + kl_loss_6)
+                        # use weighting to avoid bias towards high value views
                         rep_loss = (l * loss_weightes[:random_sample_size * n_attr]).mean()
+                        kl_losses.append(kl_loss)
+                        rep_losses.append(rep_loss)
                         losses.append(kl_loss * model_params["lambda_kl"] + rep_loss)
                         
                     optimizer.zero_grad()
                     loss = torch.mean(torch.stack(losses))
+                    #TODO add proximal term
+                    kl_loss = torch.mean(torch.stack(kl_losses))
+                    rep_loss = torch.mean(torch.stack(rep_losses))
                     if not fed:
-                        loss_compare[i][j][0][epoch] = loss
-                    else:
-                        loss_compare[i][j][1][epoch] = loss
+                        loss_vs_epoch[i][j][0][epoch] = loss
+                        rep_vs_epoch[i][j][0][epoch] = rep_loss
+                        kl_vs_epoch[i][j][0][epoch] = kl_loss
+                    elif update_freq==1:
+                        loss_vs_epoch[i][j][1][epoch] = loss
+                        rep_vs_epoch[i][j][1][epoch] = rep_loss
+                        kl_vs_epoch[i][j][1][epoch] = kl_loss
+                    elif update_freq==10:
+                        loss_vs_epoch[i][j][2][epoch] = loss
+                        rep_vs_epoch[i][j][2][epoch] = rep_loss
+                        kl_vs_epoch[i][j][2][epoch] = kl_loss
+                    elif update_freq==1000:
+                        loss_vs_epoch[i][j][3][epoch] = loss
+                        rep_vs_epoch[i][j][3][epoch] = rep_loss
+                        kl_vs_epoch[i][j][3][epoch] = kl_loss
                     loss.backward()
                     optimizer.step()
                     
-                if fed and epoch % config.update_freq == 0:
+                if fed and epoch % update_freq == 0:
                     # update main models from all parameters received
                     main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
                                       model_dict, number_of_clients, \
                                         list(range(0, number_of_clients)), None, epoch+1)           
                 
-                    # send models to all clients
-                    MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
-                                                                number_of_clients, list(range(0, number_of_clients)))
+                    # # send models to all clients
+                    # MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
+                    #                                             number_of_clients, list(range(0, number_of_clients)))
                     
-                    print("main model updated, and send to all clients")
-                    
+                    # print("main model updated, and send to all clients")
+                
+                # The evaluation error after the epochth training
                 if epoch % 10 == 0:
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                         model = model_dict[j]
@@ -611,11 +646,37 @@ class MGN_NET(torch.nn.Module):
                         try:
                             #Early stopping and restoring logic
                             torch.save(model.state_dict(), "./temp/weight_" + model_id + "_" + str(rep_loss)[:5]  + ".model")
-                            if len(test_errors_rep) > early_stop_rounds:
-                                last_errors = test_errors_rep[-early_stop_rounds:]
-                                if(early_stop and all(last_errors[i+1] < last_errors[i] for i in range(early_stop_rounds-1))):
-                                    print("Client " + str(j) +" Early Stopping")
-                                    early_stop_dict[j] = True
+                            # if len(test_errors_rep) > early_stop_rounds:
+                            #     last_errors = test_errors_rep[-early_stop_rounds:]
+                            #     if(early_stop and all(last_errors[i+1] < last_errors[i] for i in range(early_stop_rounds-1))):
+                            #         print("Client " + str(j) +" Early Stopping")
+                            #         early_stop_dict[j] = True
+                            
+                            
+                    # Check for early stopping:\
+                            early_stop_interval = config.early_stop_interval
+                            if epoch > early_stop_interval:
+                                if not fed:
+                                    if abs(loss_vs_epoch[i][j][0][epoch] - loss_vs_epoch[i][j][0][epoch-early_stop_interval]) < config.early_stop_distance:
+                                        print("Client " + str(j) +" Early Stopping")
+                                        early_stop_dict[j] = True
+                                        continue
+                                elif update_freq==1:
+                                    if abs(loss_vs_epoch[i][j][1][epoch] - loss_vs_epoch[i][j][1][epoch-early_stop_interval]) < config.early_stop_distance:
+                                        print("Client " + str(j) +" Early Stopping")
+                                        early_stop_dict[j] = True
+                                        continue
+                                elif update_freq==10:
+                                    if abs(loss_vs_epoch[i][j][2][epoch] - loss_vs_epoch[i][j][2][epoch-early_stop_interval]) < config.early_stop_distance:
+                                        print("Client " + str(j) +" Early Stopping")
+                                        early_stop_dict[j] = True
+                                        continue
+                                elif update_freq==1000:
+                                    if abs(loss_vs_epoch[i][j][3][epoch] - loss_vs_epoch[i][j][3][epoch-early_stop_interval]) < config.early_stop_distance:
+                                        print("Client " + str(j) +" Early Stopping")
+                                        early_stop_dict[j] = True
+                                        continue
+                                    
                         except:
                             print("ERROR occured")
                             break
