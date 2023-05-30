@@ -579,6 +579,7 @@ def clear_output():
     if not os.path.exists('output/'):
             os.mkdir('output/')
     shutil.rmtree('output/')
+    os.mkdir('output/')
 
 def loss_compare_list_init(n_folds, n_clients, n_epochs):
     return np.zeros((n_folds, n_clients, 4, n_epochs))

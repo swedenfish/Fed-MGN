@@ -17,13 +17,15 @@ number_of_clients = 3
 early_stop_rounds = 4
 early_stop_distance = 1
 early_stop_interval = 50
+number_of_folds = 4
+
 if test_func:
     early_stop_distance = 10
     early_stop_interval = 20 
+    number_of_folds = 1
 
 n_max_epochs = 500
 early_stop = True
-number_of_folds = 4
 # update_freq = 1
 
 temporal_weighting = False
