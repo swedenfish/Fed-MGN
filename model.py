@@ -640,9 +640,9 @@ class MGN_NET(torch.nn.Module):
                         rep_vs_epoch[i][j][3][epoch] = rep_loss
                         kl_vs_epoch[i][j][3][epoch] = kl_loss
                     #TODO add proximal term
-                    if fed:
-                        weight_diff = MGN_NET.cal_weight_diff(main_model, model)
-                        loss += config.mu * 0.5 * (weight_diff * weight_diff)
+                    # if fed:
+                    #     weight_diff = MGN_NET.cal_weight_diff(main_model, model)
+                    #     loss += config.mu * 0.5 * (weight_diff * weight_diff)
                     loss.backward()
                     optimizer.step()
                     

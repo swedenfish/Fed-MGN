@@ -9,12 +9,18 @@ MODEL_WEIGHT_BACKUP_PATH = "./output/model_weights"
 DEEP_CBT_SAVE_PATH = "./output/deep_cbts"
 TEMP_FOLDER = "./temp"
 
+test_func = True
+
 #Control variables
 number_of_clients = 3
 # fed = False
 early_stop_rounds = 4
 early_stop_distance = 1
 early_stop_interval = 50
+if test_func:
+    early_stop_distance = 10
+    early_stop_interval = 20 
+
 n_max_epochs = 500
 early_stop = True
 number_of_folds = 4

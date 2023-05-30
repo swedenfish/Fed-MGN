@@ -502,11 +502,77 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed1, loss_table_list_fe
     plt.close()
     # plt.show()
     
+
+# Function overloading for ploting only one loss table
+def plotLosses(loss_table):
+    if not os.path.exists("output/Loss_images"):
+        os.makedirs("output/Loss_images")
+    shutil.rmtree('output/' + "Loss_images")
     
+    fed_rep_sum1 = [0] * config.number_of_clients
+    
+    for i in range(config.number_of_folds):
+        os.makedirs("output/Loss_images/Fold " + str(i))
+        cur_loss_table_fed1 = loss_table[i]
+        labels = ["Client " + str(i) for i in range(config.number_of_clients)]
+        
+        fed_rep1 = [rep_loss.item() for (rep_loss,_) in cur_loss_table_fed1]
+        fed_rep_sum1 = list(map(add, fed_rep_sum1, fed_rep1))
+        
+        lower = min(fed_rep1)
+        upper = max(fed_rep1)
+        diff = upper - lower
+        lower -= 0.3*diff
+        upper += 0.3*diff
+        x = np.arange(len(labels))  # the label locations
+        width = 0.5  # the width of the bars
+        fig, ax = plt.subplots()
+        ax.set_ylim(lower, upper)
+        fig.set_size_inches(12.8,9.6)
+        
+        rects2 = ax.bar(x, fed_rep1, width, label='f=1')
+        
+        ax.set_ylabel('Rep loss')
+        ax.set_title('Fold ' + str(i) + " Rep loss comparison")
+        ax.set_xticks(x, labels)
+        ax.legend()
+        
+        ax.bar_label(rects2, padding=3)
+        
+        fig.tight_layout()
+        plt.savefig("output/Loss_images/Fold " + str(i) + "/Rep")
+        plt.close()
+        
+        
+        # Combining all folds
+    os.makedirs("output/Loss_images/Average")
+    # rep_loss
+    fed_rep_averge1 = [x/config.number_of_folds for x in fed_rep_sum1]
+    lower = min(fed_rep_averge1)
+    upper = max(fed_rep_averge1)
+    diff = upper - lower
+    lower -= 0.3*diff
+    upper += 0.3*diff
+    x = np.arange(len(labels))  # the label locations
+    width = 0.5  # the width of the bars
+    fig, ax = plt.subplots()
+    ax.set_ylim(lower, upper)
+    fig.set_size_inches(12.8,9.6)
+    rects2 = ax.bar(x, fed_rep_averge1, width, label='f=1')
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('Rep loss')
+    ax.set_title("Average Rep loss comparison")
+    ax.set_xticks(x, labels)
+    ax.legend()
+    ax.bar_label(rects2, padding=3)
+    fig.tight_layout()
+    plt.savefig("output/Loss_images/Average" + "/Rep")
+    plt.close()
+
 def clear_output():
-    if not os.path.exists('output/' + "CBT_images"):
-            os.mkdir('output/' + "CBT_images")
-    shutil.rmtree('output/' + "CBT_images")
+    if not os.path.exists('output/'):
+            os.mkdir('output/')
+    shutil.rmtree('output/')
 
 def loss_compare_list_init(n_folds, n_clients, n_epochs):
     return np.zeros((n_folds, n_clients, 4, n_epochs))
