@@ -140,6 +140,7 @@ def read_all_dataset(root, read_indices = None, connection_mask = None):
 
 def preprocess_data_array(data_path, number_of_folds, current_fold_id):
     X = np.load(data_path)
+    # 155 for ASD
     # print(np.shape(X))
     np.random.seed(35813)
     np.random.shuffle(X)
@@ -149,6 +150,11 @@ def preprocess_data_array(data_path, number_of_folds, current_fold_id):
     #Split train and test
     X_train = X[train_indices]
     X_test = X[test_indices]
+    # ASD
+    # 116 = 3 folds for train
+    # print(np.shape(X_train))
+    # 39 = 1 fold for test
+    # print(np.shape(X_test))
     train_channel_means = np.mean(X_train, axis=(0,1,2))
     train_channel_std =   np.std(X_train, axis=(0,1,2))
     return X_train, X_test, train_channel_means, train_channel_std

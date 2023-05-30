@@ -534,7 +534,10 @@ class MGN_NET(torch.nn.Module):
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
             model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
-            print(str(len(train_casted_dict[0])) + " train_data")
+            # 38 38 40 for 3 clients in ASD
+            # print(str(len(train_casted_dict[0])) + " train_data")
+            # print(str(len(train_casted_dict[1])) + " train_data")
+            # print(str(len(train_casted_dict[2])) + " train_data")
             number_views = config.number_of_views
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
