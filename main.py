@@ -15,8 +15,6 @@ loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config
 rep_loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
 kl_loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
 
-helper.clear_output()
-
 if config.test_func:
     print("********* With federation *********")
     print("update frequency = 1")
@@ -36,6 +34,7 @@ if config.test_func:
                             rep_vs_epoch = rep_loss_compare_list,
                             kl_vs_epoch = kl_loss_compare_list,
                             update_freq = 1)
+    helper.clear_output()
     np.save("./output/loss_list_fed1", loss_list_fed1)
     loss_list_fed1 = np.load("./output/loss_list_fed1.npy")
     helper.plotLosses(loss_list_fed1)

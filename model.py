@@ -109,8 +109,6 @@ class MGN_NET(torch.nn.Module):
             test_data = all_data[round(length*0.8):]
         else:
             print("n_folds error: " + n_folds)
-            
-        number_of_data = all_train_data.shape[0]
         
         model_dict = []
         train_data_dict = []
@@ -120,6 +118,10 @@ class MGN_NET(torch.nn.Module):
         optimizer_dict = []
         test_errors_rep_dict = []
         
+        validation_data = all_train_data[0:10]
+        all_train_data = all_train_data[10:]
+        
+        number_of_data = all_train_data.shape[0]
         
         for n in range(number_of_clients):
             
@@ -157,7 +159,8 @@ class MGN_NET(torch.nn.Module):
             test_errors_rep = []
             test_errors_rep_dict.append(test_errors_rep)
         test_casted = [d.to(device) for d in helper.cast_data(test_data)]
-        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted)
+        validation_casted = [d.to(device) for d in helper.cast_data(validation_data)]
+        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted)
     
     
     # Not used
@@ -522,7 +525,9 @@ class MGN_NET(torch.nn.Module):
             
         model_id = str(uuid.uuid4())
         model_params = config.PARAMS
-
+        # Same shape with loss_compare_list
+        validation_error = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
+        
         for i in range(n_folds):
             print("********* FOLD {} *********".format(i))
             # Store each clients' final loss in this fold
@@ -533,11 +538,11 @@ class MGN_NET(torch.nn.Module):
             main_model = main_model.to(device)
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
-            model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
+            model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
             # 38 38 40 for 3 clients in ASD
-            # print(str(len(train_casted_dict[0])) + " train_data")
-            # print(str(len(train_casted_dict[1])) + " train_data")
-            # print(str(len(train_casted_dict[2])) + " train_data")
+            print(str(len(train_casted_dict[0])) + " train_data")
+            print(str(len(train_casted_dict[1])) + " train_data")
+            print(str(len(train_casted_dict[2])) + " train_data")
             number_views = config.number_of_views
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
@@ -660,7 +665,25 @@ class MGN_NET(torch.nn.Module):
                     #                                             number_of_clients, list(range(0, number_of_clients)))
                     
                     # print("main model updated, and send to all clients")
-                
+                for j in [i for i, x in enumerate(early_stop_dict) if not x]:
+                    model = model_dict[j]
+                    train_casted = train_casted_dict[j]
+                    cbt = MGN_NET.generate_cbt_median(model, train_casted)
+                    rep_loss = MGN_NET.mean_frobenious_distance(cbt, validation_casted)
+                    kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, validation_casted, six_views = (number_views==6))
+                    rep_loss = float(rep_loss)
+                    kl_loss = float(kl1+kl2+kl3+kl4+kl5+kl6)
+                    error = kl_loss * model_params["lambda_kl"] + rep_loss
+                    
+                    if not fed:
+                        validation_error[i][j][0][epoch] = error
+                    elif update_freq==1:
+                        validation_error[i][j][1][epoch] = error
+                    elif update_freq==10:
+                        validation_error[i][j][2][epoch] = error
+                    elif update_freq==1000:
+                        validation_error[i][j][3][epoch] = error
+                    
                 # The evaluation error after the epochth training
                 if epoch % 10 == 0:
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
@@ -693,22 +716,22 @@ class MGN_NET(torch.nn.Module):
                             early_stop_interval = config.early_stop_interval
                             if epoch > early_stop_interval:
                                 if not fed:
-                                    if abs(loss_vs_epoch[i][j][0][epoch] - loss_vs_epoch[i][j][0][epoch-early_stop_interval]) < config.early_stop_distance:
+                                    if abs(validation_error[i][j][0][epoch] - validation_error[i][j][0][epoch-early_stop_interval]) < config.early_stop_distance:
                                         print("Client " + str(j) +" Early Stopping")
                                         early_stop_dict[j] = True
                                         continue
                                 elif update_freq==1:
-                                    if abs(loss_vs_epoch[i][j][1][epoch] - loss_vs_epoch[i][j][1][epoch-early_stop_interval]) < config.early_stop_distance:
+                                    if abs(validation_error[i][j][1][epoch] - validation_error[i][j][1][epoch-early_stop_interval]) < config.early_stop_distance:
                                         print("Client " + str(j) +" Early Stopping")
                                         early_stop_dict[j] = True
                                         continue
                                 elif update_freq==10:
-                                    if abs(loss_vs_epoch[i][j][2][epoch] - loss_vs_epoch[i][j][2][epoch-early_stop_interval]) < config.early_stop_distance:
+                                    if abs(validation_error[i][j][2][epoch] - validation_error[i][j][2][epoch-early_stop_interval]) < config.early_stop_distance:
                                         print("Client " + str(j) +" Early Stopping")
                                         early_stop_dict[j] = True
                                         continue
                                 elif update_freq==1000:
-                                    if abs(loss_vs_epoch[i][j][3][epoch] - loss_vs_epoch[i][j][3][epoch-early_stop_interval]) < config.early_stop_distance:
+                                    if abs(validation_error[i][j][3][epoch] - validation_error[i][j][3][epoch-early_stop_interval]) < config.early_stop_distance:
                                         print("Client " + str(j) +" Early Stopping")
                                         early_stop_dict[j] = True
                                         continue
