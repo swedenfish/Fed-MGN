@@ -510,7 +510,7 @@ def plotLosses(loss_table_list_non_fed, loss_table_list_fed1, loss_table_list_fe
     
 
 # Function overloading for ploting only one loss table
-def plotLosses(loss_table):
+def plotSingleLoss(loss_table):
     if not os.path.exists("output/Loss_images"):
         os.makedirs("output/Loss_images")
     shutil.rmtree('output/' + "Loss_images")

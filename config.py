@@ -30,7 +30,7 @@ early_stop = True
 
 temporal_weighting = False
 
-mu = 10
+mu = 0.001
 
 # Normalize views when calculating rep loss to avoid overfitting large-number views
 weighted_loss = True

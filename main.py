@@ -38,7 +38,7 @@ if config.test_func:
                             update_freq = 1)
     np.save("./output/loss_list_fed1", loss_list_fed1)
     loss_list_fed1 = np.load("./output/loss_list_fed1.npy")
-    helper.plotLosses(loss_list_fed1)
+    helper.plotSingleLoss(loss_list_fed1)
     
 else:
 
@@ -132,9 +132,6 @@ else:
     loss_list_fed10 = np.load("./output/loss_list_fed10.npy")
     loss_list_fed1000 = np.load("./output/loss_list_fed1000.npy")
     helper.plotLosses(loss_list_non_fed, loss_list_fed1, loss_list_fed10, loss_list_fed1000)
-
-
-
 
     #Replot loss_vs_epoch
     loss_compare_list = np.load("./output/loss_vs_epoch.npy")

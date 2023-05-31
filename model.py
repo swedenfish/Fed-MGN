@@ -277,15 +277,54 @@ class MGN_NET(torch.nn.Module):
         This function calculates the weight difference between global model and client mode in order to calculate the proximal loss
         """
         client_model = model
-        diff_sum = 0
-        diff_sum += torch.sum(torch.abs(client_model.conv1.nn[0].weight.data.clone() - main_model.conv1.nn[0].weight.data.clone()))
-        diff_sum += torch.sum(torch.abs(client_model.conv2.nn[0].weight.data.clone() - main_model.conv2.nn[0].weight.data.clone()))
-        diff_sum += torch.sum(torch.abs(client_model.conv3.nn[0].weight.data.clone() - main_model.conv3.nn[0].weight.data.clone()))
         
-        diff_sum += torch.sum(torch.abs(client_model.conv1.lin.weight.data.clone() - main_model.conv1.lin.weight.data.clone()))
-        diff_sum += torch.sum(torch.abs(client_model.conv2.lin.weight.data.clone() - main_model.conv2.lin.weight.data.clone()))
-        diff_sum += torch.sum(torch.abs(client_model.conv3.lin.weight.data.clone() - main_model.conv3.lin.weight.data.clone()))
+        w1 = client_model.conv1.nn[0].weight
+        w2 = client_model.conv2.nn[0].weight
+        w3 = client_model.conv3.nn[0].weight
+        w4 = client_model.conv1.lin.weight
+        w5 = client_model.conv2.lin.weight
+        w6 = client_model.conv3.lin.weight
         
+        main_model_w1 = main_model.conv1.nn[0].weight.data.clone().detach()
+        main_model_w2 = main_model.conv2.nn[0].weight.data.clone().detach()
+        main_model_w3 = main_model.conv3.nn[0].weight.data.clone().detach()
+        main_model_w4 = main_model.conv1.lin.weight.data.clone().detach()
+        main_model_w5 = main_model.conv2.lin.weight.data.clone().detach()
+        main_model_w6 = main_model.conv3.lin.weight.data.clone().detach()
+        
+        # torch.Size([36, 6])
+        # torch.Size([864, 6])
+        # torch.Size([192, 6])
+        # torch.Size([36, 1])
+        # torch.Size([24, 36])
+        # torch.Size([8, 24])
+        # torch.Size([36, 6])
+        # torch.Size([864, 6])
+        # torch.Size([192, 6])
+        # torch.Size([36, 1])
+        # torch.Size([24, 36])
+        # torch.Size([8, 24])
+
+        # print(w1.shape)
+        # print(w2.shape)
+        # print(w3.shape)
+        # print(w4.shape)
+        # print(w5.shape)
+        # print(w6.shape)
+        # print(main_model_w1.shape)
+        # print(main_model_w2.shape)
+        # print(main_model_w3.shape)
+        # print(main_model_w4.shape)
+        # print(main_model_w5.shape)
+        # print(main_model_w6.shape)
+        
+        diff_sum = torch.sum(torch.abs(torch.subtract(w1, main_model_w1)))
+        diff_sum = torch.add(diff_sum, torch.sum(torch.abs(torch.subtract(w2, main_model_w2))))
+        diff_sum = torch.add(diff_sum, torch.sum(torch.abs(torch.subtract(w3, main_model_w3))))
+        diff_sum = torch.add(diff_sum, torch.sum(torch.abs(torch.subtract(w4, main_model_w4))))
+        diff_sum = torch.add(diff_sum, torch.sum(torch.abs(torch.subtract(w5, main_model_w5))))
+        diff_sum = torch.add(diff_sum, torch.sum(torch.abs(torch.subtract(w6, main_model_w6))))
+
         return diff_sum
         
         
@@ -539,10 +578,11 @@ class MGN_NET(torch.nn.Module):
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
             model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
-            # 38 38 40 for 3 clients in ASD
-            print(str(len(train_casted_dict[0])) + " train_data")
-            print(str(len(train_casted_dict[1])) + " train_data")
-            print(str(len(train_casted_dict[2])) + " train_data")
+            # 38 38 40 for 3 clients in ASD  39 is test (no validation)
+            # 155/4 -> 39 as test set, 116 as training. 10 as validation -> 106 for training. -> 35, 35, 36 
+            # print(str(len(train_casted_dict[0])) + " train_data")
+            # print(str(len(train_casted_dict[1])) + " train_data")
+            # print(str(len(train_casted_dict[2])) + " train_data")
             number_views = config.number_of_views
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
@@ -627,8 +667,10 @@ class MGN_NET(torch.nn.Module):
                         rep_losses.append(rep_loss)
                         losses.append(kl_loss * model_params["lambda_kl"] + rep_loss)
                         
-                    optimizer.zero_grad()
                     loss = torch.mean(torch.stack(losses))
+                    if fed:
+                        weight_diff = MGN_NET.cal_weight_diff(main_model, model)
+                        loss = torch.add(loss, torch.mul(torch.mul(weight_diff, weight_diff), config.mu * 0.5))
                     kl_loss = torch.mean(torch.stack(kl_losses))
                     rep_loss = torch.mean(torch.stack(rep_losses))
                     if not fed:
@@ -648,9 +690,8 @@ class MGN_NET(torch.nn.Module):
                         rep_vs_epoch[i][j][3][epoch] = rep_loss
                         kl_vs_epoch[i][j][3][epoch] = kl_loss
                     #TODO add proximal term
-                    # if fed:
-                    #     weight_diff = MGN_NET.cal_weight_diff(main_model, model)
-                    #     loss += config.mu * 0.5 * (weight_diff * weight_diff)
+                    
+                    optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
                     
