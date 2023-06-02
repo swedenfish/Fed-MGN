@@ -12,7 +12,7 @@ TEMP_FOLDER = "./temp"
 test_func = True
 
 #Control variables
-number_of_clients = 3
+number_of_clients = 10
 # fed = False
 early_stop_rounds = 4
 early_stop_distance = 1
@@ -34,7 +34,9 @@ mu = 0.001
 
 # Normalize views when calculating rep loss to avoid overfitting large-number views
 weighted_loss = True
-average_all = True
+average_all = False
+
+prox = False
 
 # Should be decided by input shape
 number_of_views = 6

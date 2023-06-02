@@ -668,7 +668,7 @@ class MGN_NET(torch.nn.Module):
                         losses.append(kl_loss * model_params["lambda_kl"] + rep_loss)
                         
                     loss = torch.mean(torch.stack(losses))
-                    if fed:
+                    if fed and config.prox:
                         weight_diff = MGN_NET.cal_weight_diff(main_model, model)
                         loss = torch.add(loss, torch.mul(torch.mul(weight_diff, weight_diff), config.mu * 0.5))
                     kl_loss = torch.mean(torch.stack(kl_losses))
@@ -689,17 +689,20 @@ class MGN_NET(torch.nn.Module):
                         loss_vs_epoch[i][j][3][epoch] = loss
                         rep_vs_epoch[i][j][3][epoch] = rep_loss
                         kl_vs_epoch[i][j][3][epoch] = kl_loss
-                    #TODO add proximal term
                     
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
                     
                 if fed and epoch % update_freq == 0:
+                    all_clents = list(range(0, number_of_clients))
+                    portion = 0.1
+                    non_stragglers = random.sample(all_clents, int(portion * number_of_clients))
+                    non_stragglers.sort()
                     # update main models from all parameters received
                     main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
                                       model_dict, number_of_clients, \
-                                        list(range(0, number_of_clients)), None, epoch+1)           
+                                        non_stragglers, None, epoch+1)           
                 
                     # # send models to all clients
                     # MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
