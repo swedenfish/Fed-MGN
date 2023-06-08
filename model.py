@@ -117,7 +117,7 @@ class MGN_NET(torch.nn.Module):
         loss_weightes_dict = []
         optimizer_dict = []
         test_errors_rep_dict = []
-        
+        datanumber_list = []
         validation_data = all_train_data[0:10]
         all_train_data = all_train_data[10:]
         
@@ -151,7 +151,7 @@ class MGN_NET(torch.nn.Module):
                     train_data = all_train_data[indexs[n-1]:]
                 else:
                     train_data = all_train_data[indexs[n-1] : indexs[n]]
-            print(len(train_data))
+            datanumber_list.append(len(train_data))
             
             train_data_dict.append(train_data)
                 
@@ -179,7 +179,7 @@ class MGN_NET(torch.nn.Module):
             test_errors_rep_dict.append(test_errors_rep)
         test_casted = [d.to(device) for d in helper.cast_data(test_data)]
         validation_casted = [d.to(device) for d in helper.cast_data(validation_data)]
-        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted)
+        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted, datanumber_list)
     
     
     # Not used
@@ -350,14 +350,14 @@ class MGN_NET(torch.nn.Module):
         
     def set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, model_dict, \
                                                                      number_of_samples, clients_with_access, \
-                                                                    last_updated_dict, current_epoch):
+                                                                    last_updated_dict, current_epoch, datanumber_list):
         '''
         This function takes combined weights for global model and assigns them to the global model.
         '''
         conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
         conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
         conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
-                                                        number_of_samples, clients_with_access, \
+                                                        number_of_samples, clients_with_access,datanumber_list, \
                                                         average_all, last_updated_dict, current_epoch)
         
         with torch.no_grad():
@@ -378,7 +378,7 @@ class MGN_NET(torch.nn.Module):
 
         return main_model
 
-    def get_averaged_weights(model_dict, number_of_samples, clients_with_access, \
+    def get_averaged_weights(model_dict, number_of_samples, clients_with_access,datanumber_list, \
                          average_all=True, last_updated_dict=None, current_epoch=-1):
         '''
         This function averages model weights after a designated number of round so that we can have the weights of the global model
@@ -416,14 +416,16 @@ class MGN_NET(torch.nn.Module):
             #TODO fix this
             def getWeight_i(i):
                 if config.fedavg:
-                    if i == 0: return 68
-                    else: return 23
+                    return datanumber_list[i]
                 else:    
                     return ((np.e / 2) ** (- (current_epoch - last_updated_dict['client'+str(i)])))
+                
+            all_weights = sum(getWeight_i(i) for i in cls)
+            print(all_weights)
             for i in cls: # cls
                 if temporal_weighting:
-                    all_weights = getWeight_i(0) + getWeight_i(1) + getWeight_i(2)
                     client_weight = getWeight_i(i) / all_weights
+                    print(client_weight)
                 else:
                     # Simply average with equal weights
                     client_weight = 1/len(cls)
@@ -602,7 +604,7 @@ class MGN_NET(torch.nn.Module):
             main_model = main_model.to(device)
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
-            model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
+            model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted, datanumber_list = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
             # 38 38 40 for 3 clients in ASD  39 is test (no validation)
             # 155/4 -> 39 as test set, 116 as training. 10 as validation -> 106 for training. -> 35, 35, 36 
             # print(str(len(train_casted_dict[0])) + " train_data")
@@ -735,7 +737,7 @@ class MGN_NET(torch.nn.Module):
                     # update main models from all parameters received
                     main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
                                       model_dict, number_of_clients, \
-                                        non_stragglers, None, epoch+1)
+                                        non_stragglers, None, epoch+1, datanumber_list)
                     print("update main model")       
                 
                     # # send models to all clients
