@@ -122,23 +122,42 @@ class MGN_NET(torch.nn.Module):
         all_train_data = all_train_data[10:]
         
         number_of_data = all_train_data.shape[0]
+        # print(number_of_data)
         
+        size = number_of_data // number_of_clients 
+        
+        indexs = random.sample(range(number_of_data), number_of_clients-1)
+        indexs.sort()
+        
+        print(indexs)
         for n in range(number_of_clients):
             
             model = MGN_NET(dataset)
             model = model.to(device)
             model_dict.append(model)
             
-            size = number_of_data // number_of_clients 
-            if(n==number_of_clients-1):
-                train_data = all_train_data[n*size:]
+            # Equal size when iid
+            if config.iid:
+                if(n==number_of_clients-1):
+                    train_data = all_train_data[n*size:]
+                else:
+                    train_data = all_train_data[n*size : (n+1)*size]
+                
+            # Manually split the data so they behave in a non_iid way
             else:
-                train_data = all_train_data[n*size : (n+1)*size]
-            train_data_dict.append(train_data)
+                if(n == 0):
+                    train_data = all_train_data[0:indexs[0]]
+                elif(n==number_of_clients-1):
+                    train_data = all_train_data[indexs[n-1]:]
+                else:
+                    train_data = all_train_data[indexs[n-1] : indexs[n]]
+            print(len(train_data))
             
+            train_data_dict.append(train_data)
+                
             train_casted = [d.to(device) for d in helper.cast_data(train_data)]
             train_casted_dict.append(train_casted)
-            
+                    
             # each client's targets are just all its train data
             # will randomly choose subset of it to evaluate loss
             targets =  [torch.tensor(tensor, dtype = torch.float32).to(device) for tensor in train_data]
@@ -394,13 +413,19 @@ class MGN_NET(torch.nn.Module):
             cls = clients_with_access
 
         with torch.no_grad():
+            #TODO fix this
             def getWeight_i(i):
-                return ((np.e / 2) ** (- (current_epoch - last_updated_dict['client'+str(i)])))
+                if config.fedavg:
+                    if i == 0: return 68
+                    else: return 23
+                else:    
+                    return ((np.e / 2) ** (- (current_epoch - last_updated_dict['client'+str(i)])))
             for i in cls: # cls
-                if temporal_weighting == True:
+                if temporal_weighting:
                     all_weights = getWeight_i(0) + getWeight_i(1) + getWeight_i(2)
                     client_weight = getWeight_i(i) / all_weights
                 else:
+                    # Simply average with equal weights
                     client_weight = 1/len(cls)
 
                 conv1_nn_mean_weight += (client_weight * model_dict[i].conv1.nn[0].weight.data.clone())
@@ -589,9 +614,13 @@ class MGN_NET(torch.nn.Module):
             
             #Ready to start
             for epoch in range(n_max_epochs):
+                if all(early_stop_dict):
+                    print("finish")
+                    break
                 
                 if fed and epoch % update_freq == 0:
                     # send models to all clients
+                    print("send model to clients")
                     MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
                                                                 number_of_clients, list(range(0, number_of_clients)))
                     
@@ -694,21 +723,27 @@ class MGN_NET(torch.nn.Module):
                     loss.backward()
                     optimizer.step()
                     
+                print("local finish")
                 if fed and epoch % update_freq == 0:
                     all_clents = list(range(0, number_of_clients))
-                    portion = 0.1
-                    non_stragglers = random.sample(all_clents, int(portion * number_of_clients))
+                    all_clents = [i for (i, v) in zip(all_clents, early_stop_dict) if not v]
+                    # control the number of strugglers
+                    portion = 0.9
+                    non_stragglers = random.sample(all_clents, int(portion * len(all_clents)))
                     non_stragglers.sort()
+                    # print(non_stragglers)
                     # update main models from all parameters received
                     main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
                                       model_dict, number_of_clients, \
-                                        non_stragglers, None, epoch+1)           
+                                        non_stragglers, None, epoch+1)
+                    print("update main model")       
                 
                     # # send models to all clients
                     # MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
                     #                                             number_of_clients, list(range(0, number_of_clients)))
                     
                     # print("main model updated, and send to all clients")
+                # Update early stopping error list using validation set
                 for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                     model = model_dict[j]
                     train_casted = train_casted_dict[j]
@@ -727,9 +762,8 @@ class MGN_NET(torch.nn.Module):
                         validation_error[i][j][2][epoch] = error
                     elif update_freq==1000:
                         validation_error[i][j][3][epoch] = error
-                    
                 # The evaluation error after the epochth training
-                if epoch % 10 == 0:
+                if epoch % 1 == 0:
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                         model = model_dict[j]
                         train_casted = train_casted_dict[j]
@@ -784,6 +818,9 @@ class MGN_NET(torch.nn.Module):
                             print("ERROR occured")
                             break
                     tick = tock
+                    
+                # The end of a epoch
+                print()
                 
                 
                             

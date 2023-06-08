@@ -12,7 +12,7 @@ TEMP_FOLDER = "./temp"
 test_func = True
 
 #Control variables
-number_of_clients = 10
+number_of_clients = 3
 # fed = False
 early_stop_rounds = 4
 early_stop_distance = 1
@@ -24,11 +24,17 @@ if test_func:
     early_stop_interval = 20 
     number_of_folds = 1
 
+# Split the data in an non-iid way for each client
+iid = False
+
+# Avg by num of data
+fedavg = True
+
 n_max_epochs = 500
 early_stop = True
 # update_freq = 1
 
-temporal_weighting = False
+temporal_weighting = True
 
 mu = 0.001
 
@@ -36,7 +42,8 @@ mu = 0.001
 weighted_loss = True
 average_all = False
 
-prox = False
+# Add the proximal term or not
+prox = True
 
 # Should be decided by input shape
 number_of_views = 6
