@@ -27,6 +27,9 @@ if test_func:
 # Split the data in an non-iid way for each client
 iid = False
 
+# Non-Strugglers portion
+portion = 0.1
+
 # Avg by num of data
 fedavg = True
 

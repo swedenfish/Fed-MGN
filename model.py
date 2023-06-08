@@ -129,7 +129,7 @@ class MGN_NET(torch.nn.Module):
         indexs = random.sample(range(number_of_data), number_of_clients-1)
         indexs.sort()
         
-        print(indexs)
+        # print(indexs)
         for n in range(number_of_clients):
             
             model = MGN_NET(dataset)
@@ -413,7 +413,6 @@ class MGN_NET(torch.nn.Module):
             cls = clients_with_access
 
         with torch.no_grad():
-            #TODO fix this
             def getWeight_i(i):
                 if config.fedavg:
                     return datanumber_list[i]
@@ -421,11 +420,11 @@ class MGN_NET(torch.nn.Module):
                     return ((np.e / 2) ** (- (current_epoch - last_updated_dict['client'+str(i)])))
                 
             all_weights = sum(getWeight_i(i) for i in cls)
-            print(all_weights)
+            # print(all_weights)
             for i in cls: # cls
                 if temporal_weighting:
                     client_weight = getWeight_i(i) / all_weights
-                    print(client_weight)
+                    # print(client_weight)
                 else:
                     # Simply average with equal weights
                     client_weight = 1/len(cls)
@@ -730,8 +729,10 @@ class MGN_NET(torch.nn.Module):
                     all_clents = list(range(0, number_of_clients))
                     all_clents = [i for (i, v) in zip(all_clents, early_stop_dict) if not v]
                     # control the number of strugglers
-                    portion = 0.9
-                    non_stragglers = random.sample(all_clents, int(portion * len(all_clents)))
+                    portion = config.portion
+                    non_stragglers = random.sample(all_clents, max(int(portion * len(all_clents)), 1))
+                    if not non_stragglers:
+                        print("empty")
                     non_stragglers.sort()
                     # print(non_stragglers)
                     # update main models from all parameters received
@@ -765,7 +766,7 @@ class MGN_NET(torch.nn.Module):
                     elif update_freq==1000:
                         validation_error[i][j][3][epoch] = error
                 # The evaluation error after the epochth training
-                if epoch % 1 == 0:
+                if epoch % 10 == 0:
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                         model = model_dict[j]
                         train_casted = train_casted_dict[j]
