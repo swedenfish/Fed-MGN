@@ -14,6 +14,7 @@ import time
 import sys
 from torch.nn import Sequential, Linear, ReLU
 from sklearn.cluster import KMeans
+from sklearn.cluster import AgglomerativeClustering
 
 #set seed for reproducibility
 torch.manual_seed(35813)
@@ -81,7 +82,7 @@ class MGN_NET(torch.nn.Module):
         cbt = torch.sum(diff, 2)
         
         return cbt
-    
+
     def prepare_client_dicts(data_path, n_folds, i, weighted_loss):
         """
             Prepare all dicts used for multiple clients to train their models
@@ -128,29 +129,37 @@ class MGN_NET(torch.nn.Module):
         
         indexs = random.sample(range(number_of_data), number_of_clients-1)
         indexs.sort()
-        
         # print(indexs)
+        
+        if config.non_iid_by_clustering:
+            all_train_data_casted = helper.cast_data(all_train_data)
+            train_data_cluster_labels = MGN_NET.k_mean_clustering(all_train_data_casted, number_of_clients)
         for n in range(number_of_clients):
             
             model = MGN_NET(dataset)
             model = model.to(device)
             model_dict.append(model)
             
-            # Equal size when iid
-            if config.iid:
-                if(n==number_of_clients-1):
-                    train_data = all_train_data[n*size:]
-                else:
-                    train_data = all_train_data[n*size : (n+1)*size]
-                
-            # Manually split the data so they behave in a non_iid way
-            else:
+            # Manually split the data so they behave in a non_iid way (random spliting)
+            if config.non_iid_by_numbers:
                 if(n == 0):
                     train_data = all_train_data[0:indexs[0]]
                 elif(n==number_of_clients-1):
                     train_data = all_train_data[indexs[n-1]:]
                 else:
                     train_data = all_train_data[indexs[n-1] : indexs[n]]
+            # TODO: use K nearest neighbour to split the data so they are non_iid
+            elif config.non_iid_by_clustering:
+                train_data = [all_train_data[i] for i in train_data_cluster_labels if i == n]
+                # 112, 1, 1 which is very non-iid
+                # print(len(train_data))
+            # Equal size when iid
+            else:
+                if(n==number_of_clients-1):
+                    train_data = all_train_data[n*size:]
+                else:
+                    train_data = all_train_data[n*size : (n+1)*size]
+
             datanumber_list.append(len(train_data))
             
             train_data_dict.append(train_data)
@@ -177,85 +186,35 @@ class MGN_NET(torch.nn.Module):
 
             test_errors_rep = []
             test_errors_rep_dict.append(test_errors_rep)
+        print(datanumber_list)
         test_casted = [d.to(device) for d in helper.cast_data(test_data)]
         validation_casted = [d.to(device) for d in helper.cast_data(validation_data)]
         return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted, datanumber_list)
     
+    #TODO 
+    def k_mean_clustering(data, n_clusters):
+        data_matrix = MGN_NET.distance_matrix(data)
+        model = AgglomerativeClustering(metric='precomputed', n_clusters=n_clusters, linkage='complete').fit(data_matrix)
+        # Example of model.labels_
+        # [0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+        # 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+        # 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+        # 0 0 0]
+        return model.labels_
     
-    # Not used
-    def prepare_client_dicts_using_clusters(data_path, n_folds, i, weighted_loss):
-        """
-            Very similar to prepare_client_dicts, but use a k-means cluster algorithm to decide global test set and each client's train_data
-            Prepare all dicts used for multiple clients to train their models
-            Args:
-                data_path (string): file path for the dataset 
-                n_folds (int): number of cross validation folds
-                i (int): current fold index
-                weighted_loss (bool): view normalization in centeredness loss
-            Return:
-                models: trained models 
-        """
-        n_attr = config.Nattr
-        dataset = "simulated"
-        model_params = config.PARAMS
-            
-        model_dict = []
-        train_data_dict = []
-        train_casted_dict = []
-        targets_dict = []    
-        loss_weightes_dict = []
-        optimizer_dict = []
-        test_errors_rep_dict = []
-        
-        if(n_folds == 1):
-            all_data = np.load(data_path)
-            length = all_data.shape[0]
-            train_data_dict.append(all_data[:round(length*0.8)])
-            test_data = all_data[round(length*0.8):]
-        elif(n_folds > 1):
-            #TODO
-            (train_data_dict, test_data) = MGN_NET.k_mean_clustering()
-        else:
-            print("n_folds error: " + n_folds)
-                
-                
-        # train_data_dict and test_data should be ready till here        
-        for n in range(number_of_clients):
-            
-            model = MGN_NET(dataset)
-            model = model.to(device)
-            model_dict.append(model)
-            
-            train_data = train_data_dict[n]
-            train_casted = [d.to(device) for d in helper.cast_data(train_data)]
-            train_casted_dict.append(train_casted)
-            
-            # each client's targets are just all its train data
-            # will randomly choose subset of it to evaluate loss
-            targets =  [torch.tensor(tensor, dtype = torch.float32).to(device) for tensor in train_data]
-            targets_dict.append(targets)
-
-            train_mean = np.mean(train_data, axis=(0,1,2))
-            if weighted_loss:
-                loss_weightes = torch.tensor(np.array(list((1 / train_mean) / np.max(1 / train_mean))*len(train_data)), dtype = torch.float32)
-            else:
-                loss_weightes =  torch.tensor(np.ones((n_attr*len(train_data))), dtype = torch.float32)
-            loss_weightes = loss_weightes.to(device)
-            loss_weightes_dict.append(loss_weightes)
-            
-            optimizer = torch.optim.AdamW(model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
-            optimizer_dict.append(optimizer)
-            
-            test_errors_rep = []
-            test_errors_rep_dict.append(test_errors_rep)
-        test_casted = [d.to(device) for d in helper.cast_data(test_data)]
-        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted)
+    # Calculate the difference between each of the subject's brain template (which is 35*35*6) and form a distance matrix
+    def distance_matrix(data):
+        # input data: (114, 35, 35, 6)
+        # return 114 * 114 as a distance matrix
+        num_of_subjects = len(data)
+        result = np.zeros((num_of_subjects, num_of_subjects))
+        for row in range(num_of_subjects):
+            for col in range(num_of_subjects):
+                if row != col:
+                    result[row][col] = MGN_NET.frobenious_distance(data[row], data[col])
+        return result
     
     #TODO Not used
-    def k_mean_clustering():
-        return 
-    
-    
     def simulate_dataset_using_clustering(data_path, number_of_folds, number_of_clients):
         """
         This function acts as a preprocessing function before doing training
@@ -557,6 +516,24 @@ class MGN_NET(torch.nn.Module):
         return sum(frobenius_all) / len(frobenius_all)
     
     @staticmethod
+    def frobenious_distance(data1, data2):
+        """
+            Calculate the Frobenious distance between two subjects (all views)
+            Args:
+                data1: first subject (35*35*6)
+                data2: second subject 
+        """
+        d1 = data1.con_mat
+        d2 = data2.con_mat
+        result = 0
+        for index in range(d1.shape[2]):
+            diff = torch.abs(d1[:,:,index] - d2[:,:,index])
+            diff = diff*diff
+            sum_of_all = diff.sum()
+            result += torch.sqrt(sum_of_all)
+        return result
+    
+    @staticmethod
     def train_model(n_max_epochs, data_path, early_stop, model_name, fed, loss_table_list, loss_vs_epoch, rep_vs_epoch, kl_vs_epoch, weighted_loss = config.weighted_loss, random_sample_size_para = config.N_RANDOM_SAMPLES, n_folds = 5, update_freq = 1):
         """
             Trains a model for each cross validation fold and 
@@ -639,6 +616,8 @@ class MGN_NET(torch.nn.Module):
                     random_sample_size = int(random_sample_size_para/number_of_clients)
                     loss_weightes = loss_weightes_dict[j]
                     optimizer = optimizer_dict[j]
+                    
+                    random_sample_size = min(random_sample_size, len(targets))
                     
                     for data in train_casted:
                         cbt = model(data)
@@ -725,12 +704,16 @@ class MGN_NET(torch.nn.Module):
                     optimizer.step()
                     
                 print("local finish")
-                if fed and epoch % update_freq == 0:
+                
+                # update main model
+                if fed and epoch != 0 and (epoch+1) % update_freq == 0:
                     all_clents = list(range(0, number_of_clients))
                     all_clents = [i for (i, v) in zip(all_clents, early_stop_dict) if not v]
-                    # control the number of strugglers
+                    # control the number of stragglers
                     portion = config.portion
                     non_stragglers = random.sample(all_clents, max(int(portion * len(all_clents)), 1))
+                    # Manually set which client to stragglers
+                    # non_stragglers = [0]
                     if not non_stragglers:
                         print("empty")
                     non_stragglers.sort()
@@ -746,6 +729,7 @@ class MGN_NET(torch.nn.Module):
                     #                                             number_of_clients, list(range(0, number_of_clients)))
                     
                     # print("main model updated, and send to all clients")
+                    
                 # Update early stopping error list using validation set
                 for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                     model = model_dict[j]
@@ -765,8 +749,9 @@ class MGN_NET(torch.nn.Module):
                         validation_error[i][j][2][epoch] = error
                     elif update_freq==1000:
                         validation_error[i][j][3][epoch] = error
+                        
                 # The evaluation error after the epochth training
-                if epoch % 10 == 0:
+                if (epoch+1) % 10 == 0:
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                         model = model_dict[j]
                         train_casted = train_casted_dict[j]

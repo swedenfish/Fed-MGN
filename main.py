@@ -17,9 +17,10 @@ kl_loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, con
 
 helper.clear_output()
 
+# The larger the frequency, the harder to converge (and the better the fedprox is)
 if config.test_func:
     print("********* With federation *********")
-    print("update frequency = 1")
+    print("update frequency = 10")
     # Reset all the seeds to make sure identicial conditions
     torch.manual_seed(35813)
     np.random.seed(35813)
@@ -35,7 +36,7 @@ if config.test_func:
                             loss_vs_epoch = loss_compare_list,
                             rep_vs_epoch = rep_loss_compare_list,
                             kl_vs_epoch = kl_loss_compare_list,
-                            update_freq = 1)
+                            update_freq = 10)
     np.save("./output/loss_list_fed1", loss_list_fed1)
     loss_list_fed1 = np.load("./output/loss_list_fed1.npy")
     helper.plotSingleLoss(loss_list_fed1)

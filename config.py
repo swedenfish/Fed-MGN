@@ -12,7 +12,7 @@ TEMP_FOLDER = "./temp"
 test_func = True
 
 #Control variables
-number_of_clients = 3
+number_of_clients = 8
 # fed = False
 early_stop_rounds = 4
 early_stop_distance = 1
@@ -20,15 +20,22 @@ early_stop_interval = 50
 number_of_folds = 4
 
 if test_func:
-    early_stop_distance = 10
-    early_stop_interval = 20 
-    number_of_folds = 1
+    early_stop_distance = 1
+    early_stop_interval = 50 
+    number_of_folds = 4
 
-# Split the data in an non-iid way for each client
-iid = False
+# Add the proximal term or not
+prox = False
 
 # Non-Strugglers portion
-portion = 0.1
+# The smaller the portion is, the better the fedprox performs
+portion = 0.2
+
+# Split the data in an non-iid way for each client by setting random numbers
+non_iid_by_numbers = False
+
+# Split the data in an non-iid way for each client by using clustering
+non_iid_by_clustering = True
 
 # Avg by num of data
 fedavg = True
@@ -44,9 +51,6 @@ mu = 0.001
 # Normalize views when calculating rep loss to avoid overfitting large-number views
 weighted_loss = True
 average_all = False
-
-# Add the proximal term or not
-prox = True
 
 # Should be decided by input shape
 number_of_views = 6
