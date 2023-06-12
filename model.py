@@ -313,11 +313,18 @@ class MGN_NET(torch.nn.Module):
         '''
         This function takes combined weights for global model and assigns them to the global model.
         '''
-        conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
-        conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
-        conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
-                                                        number_of_samples, clients_with_access,datanumber_list, \
-                                                        average_all, last_updated_dict, current_epoch)
+        if config.self_adaptive:
+            conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
+            conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
+            conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights_by_NN(model_dict, \
+                                                            number_of_samples, clients_with_access,datanumber_list, \
+                                                            average_all, last_updated_dict, current_epoch)
+        else:
+            conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
+            conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
+            conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
+                                                            number_of_samples, clients_with_access,datanumber_list, \
+                                                            average_all, last_updated_dict, current_epoch)
         
         with torch.no_grad():
             main_model.conv1.nn[0].weight.data = conv1_nn_mean_weight.clone()
@@ -387,6 +394,7 @@ class MGN_NET(torch.nn.Module):
                 else:
                     # Simply average with equal weights
                     client_weight = 1/len(cls)
+                print(client_weight)
 
                 conv1_nn_mean_weight += (client_weight * model_dict[i].conv1.nn[0].weight.data.clone())
                 conv1_nn_mean_bias += (client_weight * model_dict[i].conv1.nn[0].bias.data.clone())
@@ -407,6 +415,10 @@ class MGN_NET(torch.nn.Module):
                 conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
                 conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias
     
+    def get_averaged_weights_by_NN(model_dict, number_of_samples, clients_with_access,datanumber_list, \
+                         average_all=True, last_updated_dict=None, current_epoch=-1):
+        pass
+        
     @staticmethod
     def generate_subject_biased_cbts(model, train_data):
         """

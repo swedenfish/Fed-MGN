@@ -29,13 +29,15 @@ prox = False
 
 # Non-Strugglers portion
 # The smaller the portion is, the better the fedprox performs
-portion = 0.2
+portion = 1
 
 # Split the data in an non-iid way for each client by setting random numbers
 non_iid_by_numbers = False
 
 # Split the data in an non-iid way for each client by using clustering
 non_iid_by_clustering = True
+
+self_adaptive = False
 
 # Avg by num of data
 fedavg = True
