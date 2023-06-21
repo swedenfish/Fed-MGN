@@ -44,6 +44,13 @@ half_combine = False
 # take 1 if global
 simplytake_combine = True
 
+
+# fed-rank
+rank = True
+
+# Temporal Weighting
+tw = True
+
 # Avg by num of data
 fedavg = True
 

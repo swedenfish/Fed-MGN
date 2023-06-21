@@ -328,7 +328,7 @@ class MGN_NET(torch.nn.Module):
         
     def set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, model_dict, \
                                                                      number_of_samples, clients_with_access, \
-                                                                    last_updated_dict, current_epoch, datanumber_list):
+                                                                    last_updated_dict, current_epoch, datanumber_list, weight_dict):
         '''
         This function takes combined weights for global model and assigns them to the global model.
         '''
@@ -336,7 +336,7 @@ class MGN_NET(torch.nn.Module):
         conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
         conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
                                                             number_of_samples, clients_with_access,datanumber_list, \
-                                                            average_all, last_updated_dict, current_epoch)
+                                                            average_all, last_updated_dict, current_epoch, weight_dict)
         
         with torch.no_grad():
             main_model.conv1.nn[0].weight.data = conv1_nn_mean_weight.clone()
@@ -357,7 +357,7 @@ class MGN_NET(torch.nn.Module):
         return main_model
 
     def get_averaged_weights(model_dict, number_of_samples, clients_with_access,datanumber_list, \
-                         average_all=True, last_updated_dict=None, current_epoch=-1):
+                         average_all=True, last_updated_dict=None, current_epoch=-1, weight_dict = None):
         '''
         This function averages model weights after a designated number of round so that we can have the weights of the global model
         that takes full advantage of introduced devices in the federated pipeline.
@@ -393,10 +393,12 @@ class MGN_NET(torch.nn.Module):
 
         with torch.no_grad():
             def getWeight_i(i):
-                if config.fedavg:
+                if config.rank:
+                    return weight_dict[i]
+                elif config.tw:
+                    return ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
+                elif config.fedavg:
                     return datanumber_list[i]
-                else:    
-                    return ((np.e / 2) ** (- (current_epoch - last_updated_dict['client'+str(i)])))
                 
             all_weights = sum(getWeight_i(i) for i in cls)
             # print(all_weights)
@@ -605,6 +607,9 @@ class MGN_NET(torch.nn.Module):
             number_views = config.number_of_views
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
+            last_updated_dict = [0] * number_of_clients
+            weight_dict = [num/sum(datanumber_list) for num in datanumber_list]
+            print(weight_dict)
             
             #Ready to start
             for epoch in range(n_max_epochs):
@@ -614,15 +619,17 @@ class MGN_NET(torch.nn.Module):
                 
                 all_clients = list(range(0, number_of_clients))
                 involved_clients = [i for (i, v) in zip(all_clients, early_stop_dict) if not v]
-
+                
                 # if fed and epoch % update_freq == 0:
                 if fed and epoch % update_freq == 0 and epoch != 0:
                     # send models to non_stopped clients
                     print("send model to clients")
                     MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
                                                                 number_of_clients, involved_clients)
-                    
-                #     # print("main model updated, and send to all clients")
+                    for i in involved_clients:
+                        last_updated_dict[i] = epoch
+                    print(last_updated_dict)
+                # print("main model updated, and send to all clients")
                     
                 # Each client trains its model locally
                 for j in [i for i, x in enumerate(early_stop_dict) if not x]:
@@ -742,7 +749,7 @@ class MGN_NET(torch.nn.Module):
                     # update main models from all parameters received
                     main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
                                       model_dict, number_of_clients, \
-                                        non_stragglers, None, epoch+1, datanumber_list)
+                                        non_stragglers, last_updated_dict, epoch+1, datanumber_list, weight_dict)
                     print("update main model")       
                 
                     # # send models to all clients
