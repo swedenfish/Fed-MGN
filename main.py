@@ -141,4 +141,3 @@ else:
     helper.plotLossesCompare(loss_compare_list, 0)
     helper.plotLossesCompare(rep_loss_compare_list, 1)
     helper.plotLossesCompare(kl_loss_compare_list, 2)
-

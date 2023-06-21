@@ -231,23 +231,40 @@ class MGN_NET(torch.nn.Module):
         information.
         '''
         with torch.no_grad():
-            for i in range(number_of_samples): # clients_with_access 
+            if config.half_combine:
+                for i in range(number_of_samples): # clients_with_access 
 
-                model_dict[i].conv1.nn[0].weight.data = 0.5*(main_model.conv1.nn[0].weight.data.clone() + model_dict[i].conv1.nn[0].weight.data.clone())
-                model_dict[i].conv1.nn[0].bias.data = 0.5*(main_model.conv1.nn[0].bias.data.clone() + model_dict[i].conv1.nn[0].bias.data.clone())
-                model_dict[i].conv1.bias.data = 0.5*(main_model.conv1.bias.data.clone() + model_dict[i].conv1.bias.data.clone())
-                model_dict[i].conv1.lin.weight.data = 0.5*(main_model.conv1.lin.weight.data.clone() + model_dict[i].conv1.lin.weight.data.clone())
-                
-                model_dict[i].conv2.nn[0].weight.data = 0.5*(main_model.conv2.nn[0].weight.data.clone() + model_dict[i].conv2.nn[0].weight.data.clone())
-                model_dict[i].conv2.nn[0].bias.data = 0.5*(main_model.conv2.nn[0].bias.data.clone() + model_dict[i].conv2.nn[0].bias.data.clone())
-                model_dict[i].conv2.bias.data = 0.5*(main_model.conv2.bias.data.clone() + model_dict[i].conv2.bias.data.clone())
-                model_dict[i].conv2.lin.weight.data = 0.5*(main_model.conv2.lin.weight.data.clone() + model_dict[i].conv2.lin.weight.data.clone())
-                
-                model_dict[i].conv3.nn[0].weight.data = 0.5*(main_model.conv3.nn[0].weight.data.clone() + model_dict[i].conv3.nn[0].weight.data.clone())
-                model_dict[i].conv3.nn[0].bias.data = 0.5*(main_model.conv3.nn[0].bias.data.clone() + model_dict[i].conv3.nn[0].bias.data.clone())
-                model_dict[i].conv3.bias.data = 0.5*(main_model.conv3.bias.data.clone() + model_dict[i].conv3.bias.data.clone())
-                model_dict[i].conv3.lin.weight.data = 0.5*(main_model.conv3.lin.weight.data.clone() + model_dict[i].conv3.lin.weight.data.clone())
-                
+                    model_dict[i].conv1.nn[0].weight.data = 0.5*(main_model.conv1.nn[0].weight.data.clone() + model_dict[i].conv1.nn[0].weight.data.clone())
+                    model_dict[i].conv1.nn[0].bias.data = 0.5*(main_model.conv1.nn[0].bias.data.clone() + model_dict[i].conv1.nn[0].bias.data.clone())
+                    model_dict[i].conv1.bias.data = 0.5*(main_model.conv1.bias.data.clone() + model_dict[i].conv1.bias.data.clone())
+                    model_dict[i].conv1.lin.weight.data = 0.5*(main_model.conv1.lin.weight.data.clone() + model_dict[i].conv1.lin.weight.data.clone())
+                    
+                    model_dict[i].conv2.nn[0].weight.data = 0.5*(main_model.conv2.nn[0].weight.data.clone() + model_dict[i].conv2.nn[0].weight.data.clone())
+                    model_dict[i].conv2.nn[0].bias.data = 0.5*(main_model.conv2.nn[0].bias.data.clone() + model_dict[i].conv2.nn[0].bias.data.clone())
+                    model_dict[i].conv2.bias.data = 0.5*(main_model.conv2.bias.data.clone() + model_dict[i].conv2.bias.data.clone())
+                    model_dict[i].conv2.lin.weight.data = 0.5*(main_model.conv2.lin.weight.data.clone() + model_dict[i].conv2.lin.weight.data.clone())
+                    
+                    model_dict[i].conv3.nn[0].weight.data = 0.5*(main_model.conv3.nn[0].weight.data.clone() + model_dict[i].conv3.nn[0].weight.data.clone())
+                    model_dict[i].conv3.nn[0].bias.data = 0.5*(main_model.conv3.nn[0].bias.data.clone() + model_dict[i].conv3.nn[0].bias.data.clone())
+                    model_dict[i].conv3.bias.data = 0.5*(main_model.conv3.bias.data.clone() + model_dict[i].conv3.bias.data.clone())
+                    model_dict[i].conv3.lin.weight.data = 0.5*(main_model.conv3.lin.weight.data.clone() + model_dict[i].conv3.lin.weight.data.clone())
+            elif config.simplytake_combine:
+                for i in range(number_of_samples): # clients_with_access 
+
+                    model_dict[i].conv1.nn[0].weight.data = main_model.conv1.nn[0].weight.data.clone()
+                    model_dict[i].conv1.nn[0].bias.data = main_model.conv1.nn[0].bias.data.clone()
+                    model_dict[i].conv1.bias.data = main_model.conv1.bias.data.clone()
+                    model_dict[i].conv1.lin.weight.data = main_model.conv1.lin.weight.data.clone()
+                    
+                    model_dict[i].conv2.nn[0].weight.data = main_model.conv2.nn[0].weight.data.clone()
+                    model_dict[i].conv2.nn[0].bias.data = main_model.conv2.nn[0].bias.data.clone()
+                    model_dict[i].conv2.bias.data = main_model.conv2.bias.data.clone()
+                    model_dict[i].conv2.lin.weight.data = main_model.conv2.lin.weight.data.clone()
+                    
+                    model_dict[i].conv3.nn[0].weight.data = main_model.conv3.nn[0].weight.data.clone()
+                    model_dict[i].conv3.nn[0].bias.data = main_model.conv3.nn[0].bias.data.clone()
+                    model_dict[i].conv3.bias.data = main_model.conv3.bias.data.clone()
+                    model_dict[i].conv3.lin.weight.data = main_model.conv3.lin.weight.data.clone()
         return model_dict
     
     def cal_weight_diff(main_model, model):
@@ -313,16 +330,9 @@ class MGN_NET(torch.nn.Module):
         '''
         This function takes combined weights for global model and assigns them to the global model.
         '''
-        if config.self_adaptive:
-            conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
-            conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
-            conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights_by_NN(model_dict, \
-                                                            number_of_samples, clients_with_access,datanumber_list, \
-                                                            average_all, last_updated_dict, current_epoch)
-        else:
-            conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
-            conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
-            conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
+        conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
+        conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
+        conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
                                                             number_of_samples, clients_with_access,datanumber_list, \
                                                             average_all, last_updated_dict, current_epoch)
         
@@ -415,10 +425,6 @@ class MGN_NET(torch.nn.Module):
                 conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
                 conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias
     
-    def get_averaged_weights_by_NN(model_dict, number_of_samples, clients_with_access,datanumber_list, \
-                         average_all=True, last_updated_dict=None, current_epoch=-1):
-        pass
-        
     @staticmethod
     def generate_subject_biased_cbts(model, train_data):
         """
@@ -586,7 +592,6 @@ class MGN_NET(torch.nn.Module):
             print("********* FOLD {} *********".format(i))
             # Store each clients' final loss in this fold
             loss_table = []
-            
             # Main model in the sever
             main_model = MGN_NET(dataset)
             main_model = main_model.to(device)
@@ -767,8 +772,6 @@ class MGN_NET(torch.nn.Module):
                     for j in [i for i, x in enumerate(early_stop_dict) if not x]:
                         model = model_dict[j]
                         train_casted = train_casted_dict[j]
-                        #TODO
-                        #test_casted = test_casted_dict[j]
                         test_errors_rep = test_errors_rep_dict[j]
                         cbt = MGN_NET.generate_cbt_median(model, train_casted)
                         rep_loss = MGN_NET.mean_frobenious_distance(cbt, test_casted)

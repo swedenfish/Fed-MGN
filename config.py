@@ -12,7 +12,7 @@ TEMP_FOLDER = "./temp"
 test_func = True
 
 #Control variables
-number_of_clients = 8
+number_of_clients = 3
 # fed = False
 early_stop_rounds = 4
 early_stop_distance = 1
@@ -35,9 +35,14 @@ portion = 1
 non_iid_by_numbers = False
 
 # Split the data in an non-iid way for each client by using clustering
-non_iid_by_clustering = True
+non_iid_by_clustering = False
 
 self_adaptive = False
+
+# take 0.5 of global and 0.5 of client
+half_combine = True
+# take 1 if global
+simplytake_combine = True
 
 # Avg by num of data
 fedavg = True
@@ -56,6 +61,8 @@ average_all = False
 
 # Should be decided by input shape
 number_of_views = 6
+
+number_of_parameters = 12
 
 #Model Configuration
 N_ROIs = 35
