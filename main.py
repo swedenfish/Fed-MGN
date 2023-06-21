@@ -5,6 +5,9 @@ import helper
 import torch
 import random
 import numpy as np
+import shutil
+import os
+from datetime import datetime
 
 # Load dataset from MAT files
 helper.clear_dir("input")
@@ -40,6 +43,12 @@ if config.test_func:
     np.save("./output/loss_list_fed1", loss_list_fed1)
     loss_list_fed1 = np.load("./output/loss_list_fed1.npy")
     helper.plotSingleLoss(loss_list_fed1)
+    
+    # Backup
+    now = datetime.now()
+    current_time = now.strftime("%H-%M-%S")
+    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    shutil.copytree("./output" , desktop + "/output" + current_time)
     
 else:
 

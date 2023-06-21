@@ -233,8 +233,8 @@ class MGN_NET(torch.nn.Module):
         with torch.no_grad():
             if config.half_combine:
                 for i in clients_with_access:
-                    r1 = 0.4
-                    r2 = 0.6
+                    r1 = 0.5
+                    r2 = 0.5
                     model_dict[i].conv1.nn[0].weight.data = r1 * main_model.conv1.nn[0].weight.data.clone() + r2 * model_dict[i].conv1.nn[0].weight.data.clone()
                     model_dict[i].conv1.nn[0].bias.data = r1 * main_model.conv1.nn[0].bias.data.clone() + r2 * model_dict[i].conv1.nn[0].bias.data.clone()
                     model_dict[i].conv1.bias.data = r1 * main_model.conv1.bias.data.clone() + r2 * model_dict[i].conv1.bias.data.clone()
@@ -615,7 +615,8 @@ class MGN_NET(torch.nn.Module):
                 all_clients = list(range(0, number_of_clients))
                 involved_clients = [i for (i, v) in zip(all_clients, early_stop_dict) if not v]
 
-                if fed and epoch % update_freq == 0:
+                # if fed and epoch % update_freq == 0:
+                if fed and epoch % update_freq == 0 and epoch != 0:
                     # send models to non_stopped clients
                     print("send model to clients")
                     MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
@@ -722,10 +723,11 @@ class MGN_NET(torch.nn.Module):
                     loss.backward()
                     optimizer.step()
                     
-                print("local finish")
+                # print("local finish")
                 
                 # update main model
                 if fed and epoch != 0 and (epoch+1) % update_freq == 0:
+                    print("10 local rounds finished")
                     all_clients = list(range(0, number_of_clients))
                     all_clients = [i for (i, v) in zip(all_clients, early_stop_dict) if not v]
                     # control the number of stragglers
@@ -833,9 +835,9 @@ class MGN_NET(torch.nn.Module):
                         rep_loss = float(rep_loss)
                         print("Epoch: {}  |  Client: {}  |  {} Rep: {}  |  KL: {} | Time Elapsed: {:.2f}  |".format(epoch, "Global",
                                 data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4+kl5+kl6), time_elapsed))
-                        
+                        print()
                 # The end of a epoch
-                print()
+                # print()
                 
                 
             temp1 = []
