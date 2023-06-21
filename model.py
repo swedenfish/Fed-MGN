@@ -131,8 +131,8 @@ class MGN_NET(torch.nn.Module):
         indexs.sort()
         # print(indexs)
         
+        all_train_data_casted = helper.cast_data(all_train_data)
         if config.non_iid_by_clustering:
-            all_train_data_casted = helper.cast_data(all_train_data)
             train_data_cluster_labels = MGN_NET.k_mean_clustering(all_train_data_casted, number_of_clients)
         for n in range(number_of_clients):
             
@@ -189,7 +189,7 @@ class MGN_NET(torch.nn.Module):
         print(datanumber_list)
         test_casted = [d.to(device) for d in helper.cast_data(test_data)]
         validation_casted = [d.to(device) for d in helper.cast_data(validation_data)]
-        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted, datanumber_list)
+        return (model_dict, train_data_dict, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted, datanumber_list, all_train_data_casted)
     
     #TODO 
     def k_mean_clustering(data, n_clusters):
@@ -233,21 +233,22 @@ class MGN_NET(torch.nn.Module):
         with torch.no_grad():
             if config.half_combine:
                 for i in range(number_of_samples): # clients_with_access 
-
-                    model_dict[i].conv1.nn[0].weight.data = 0.5*(main_model.conv1.nn[0].weight.data.clone() + model_dict[i].conv1.nn[0].weight.data.clone())
-                    model_dict[i].conv1.nn[0].bias.data = 0.5*(main_model.conv1.nn[0].bias.data.clone() + model_dict[i].conv1.nn[0].bias.data.clone())
-                    model_dict[i].conv1.bias.data = 0.5*(main_model.conv1.bias.data.clone() + model_dict[i].conv1.bias.data.clone())
-                    model_dict[i].conv1.lin.weight.data = 0.5*(main_model.conv1.lin.weight.data.clone() + model_dict[i].conv1.lin.weight.data.clone())
+                    r1 = 0.5 
+                    r2 = 0.5
+                    model_dict[i].conv1.nn[0].weight.data = r1 * main_model.conv1.nn[0].weight.data.clone() + r2 * model_dict[i].conv1.nn[0].weight.data.clone()
+                    model_dict[i].conv1.nn[0].bias.data = r1 * main_model.conv1.nn[0].bias.data.clone() + r2 * model_dict[i].conv1.nn[0].bias.data.clone()
+                    model_dict[i].conv1.bias.data = r1 * main_model.conv1.bias.data.clone() + r2 * model_dict[i].conv1.bias.data.clone()
+                    model_dict[i].conv1.lin.weight.data = r1 * main_model.conv1.lin.weight.data.clone() + r2 * model_dict[i].conv1.lin.weight.data.clone()
                     
-                    model_dict[i].conv2.nn[0].weight.data = 0.5*(main_model.conv2.nn[0].weight.data.clone() + model_dict[i].conv2.nn[0].weight.data.clone())
-                    model_dict[i].conv2.nn[0].bias.data = 0.5*(main_model.conv2.nn[0].bias.data.clone() + model_dict[i].conv2.nn[0].bias.data.clone())
-                    model_dict[i].conv2.bias.data = 0.5*(main_model.conv2.bias.data.clone() + model_dict[i].conv2.bias.data.clone())
-                    model_dict[i].conv2.lin.weight.data = 0.5*(main_model.conv2.lin.weight.data.clone() + model_dict[i].conv2.lin.weight.data.clone())
+                    model_dict[i].conv2.nn[0].weight.data = r1 * main_model.conv2.nn[0].weight.data.clone() + r2 * model_dict[i].conv2.nn[0].weight.data.clone()
+                    model_dict[i].conv2.nn[0].bias.data = r1 * main_model.conv2.nn[0].bias.data.clone() + r2 * model_dict[i].conv2.nn[0].bias.data.clone()
+                    model_dict[i].conv2.bias.data = r1 * main_model.conv2.bias.data.clone() + r2 * model_dict[i].conv2.bias.data.clone()
+                    model_dict[i].conv2.lin.weight.data = r1 * main_model.conv2.lin.weight.data.clone() + r2 * model_dict[i].conv2.lin.weight.data.clone()
                     
-                    model_dict[i].conv3.nn[0].weight.data = 0.5*(main_model.conv3.nn[0].weight.data.clone() + model_dict[i].conv3.nn[0].weight.data.clone())
-                    model_dict[i].conv3.nn[0].bias.data = 0.5*(main_model.conv3.nn[0].bias.data.clone() + model_dict[i].conv3.nn[0].bias.data.clone())
-                    model_dict[i].conv3.bias.data = 0.5*(main_model.conv3.bias.data.clone() + model_dict[i].conv3.bias.data.clone())
-                    model_dict[i].conv3.lin.weight.data = 0.5*(main_model.conv3.lin.weight.data.clone() + model_dict[i].conv3.lin.weight.data.clone())
+                    model_dict[i].conv3.nn[0].weight.data = r1 * main_model.conv3.nn[0].weight.data.clone() + r2 * model_dict[i].conv3.nn[0].weight.data.clone()
+                    model_dict[i].conv3.nn[0].bias.data = r1 * main_model.conv3.nn[0].bias.data.clone() + r2 * model_dict[i].conv3.nn[0].bias.data.clone()
+                    model_dict[i].conv3.bias.data = r1 * main_model.conv3.bias.data.clone() + r2 * model_dict[i].conv3.bias.data.clone()
+                    model_dict[i].conv3.lin.weight.data = r1 * main_model.conv3.lin.weight.data.clone() + r2 * model_dict[i].conv3.lin.weight.data.clone()
             elif config.simplytake_combine:
                 for i in range(number_of_samples): # clients_with_access 
 
@@ -597,7 +598,7 @@ class MGN_NET(torch.nn.Module):
             main_model = main_model.to(device)
             main_optimizer = torch.optim.AdamW(main_model.parameters(), lr=model_params["learning_rate"], weight_decay= 0.00)
             
-            model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted, datanumber_list = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
+            model_dict, _, train_casted_dict, targets_dict, loss_weightes_dict, optimizer_dict, test_errors_rep_dict, test_casted, validation_casted, datanumber_list, all_train_data_casted = MGN_NET.prepare_client_dicts(data_path, n_folds, i, weighted_loss)
             # 38 38 40 for 3 clients in ASD  39 is test (no validation)
             # 155/4 -> 39 as test set, 116 as training. 10 as validation -> 106 for training. -> 35, 35, 36 
             # print(str(len(train_casted_dict[0])) + " train_data")
@@ -816,12 +817,20 @@ class MGN_NET(torch.nn.Module):
                                         print("Client " + str(j) +" Early Stopping")
                                         early_stop_dict[j] = True
                                         continue
-                                    
+                                               
                         except:
                             print("ERROR occured")
                             break
                     tick = tock
-                    
+                
+                
+                if (epoch+1) % 10 == 0:
+                    cbt = MGN_NET.generate_cbt_median(main_model, all_train_data_casted)
+                    rep_loss = MGN_NET.mean_frobenious_distance(cbt, test_casted)
+                    kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, test_casted, six_views = (number_views==6))
+                    rep_loss = float(rep_loss)
+                    print("Epoch: {}  |  Client: {}  |  {} Rep: {:.2f}  |  KL: {:.2f} | Time Elapsed: {:.2f}  |".format(epoch, "Global",
+                            data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4+kl5+kl6), time_elapsed))
                 # The end of a epoch
                 print()
                 
