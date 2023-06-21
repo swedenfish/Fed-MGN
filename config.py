@@ -40,13 +40,16 @@ non_iid_by_clustering = False
 self_adaptive = False
 
 # take 0.5 of global and 0.5 of client
-half_combine = False
+half_combine = True
+
 # take 1 if global
 simplytake_combine = True
 
 
 # fed-rank
 rank = True
+# Determines the portion of weight transfer. 1 is default
+rank_factor = 1
 
 # Temporal Weighting
 tw = True

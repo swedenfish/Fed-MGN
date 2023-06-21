@@ -325,13 +325,35 @@ class MGN_NET(torch.nn.Module):
         return diff_sum
         
         
-        
+    def update_weight_dict(loss_dict, weight_dict):
+        if loss_dict != []:
+            loss_pair = [(loss_dict[i], i) for i in range(len(loss_dict))]
+            loss_pair.sort()
+            print(loss_pair)
+            # TODO: Handle cases when there are even numbers of clients
+            for i in range(int((len(loss_pair)-1)/2)):
+                # The one gaining more weights
+                head_index = i
+                (head_loss, head_client_index) = loss_pair[head_index]
+                # The one lossing weights (it has larger loss)
+                tail_index = -i-1
+                (tail_loss, tail_client_index) = loss_pair[tail_index]
+                diff = tail_loss - head_loss
+                rank_factor = config.rank_factor
+                portion = (rank_factor * diff) / head_loss
+                amount = portion * weight_dict[tail_client_index]
+                weight_dict[tail_client_index] -= amount
+                weight_dict[head_client_index] += amount
+        return
+    
     def set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, model_dict, \
                                                                      number_of_samples, clients_with_access, \
-                                                                    last_updated_dict, current_epoch, datanumber_list, weight_dict):
+                                                                    last_updated_dict, current_epoch, datanumber_list, weight_dict, loss_dict):
         '''
         This function takes combined weights for global model and assigns them to the global model.
         '''
+        MGN_NET.update_weight_dict(loss_dict, weight_dict)
+        
         conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
         conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
         conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
@@ -353,7 +375,7 @@ class MGN_NET(torch.nn.Module):
             main_model.conv3.nn[0].bias.data = conv3_nn_mean_bias.clone()
             main_model.conv3.bias.data = conv3_bias.clone()
             main_model.conv3.lin.weight.data = conv3_root_weight.clone()
-
+        
         return main_model
 
     def get_averaged_weights(model_dict, number_of_samples, clients_with_access,datanumber_list, \
@@ -611,6 +633,9 @@ class MGN_NET(torch.nn.Module):
             weight_dict = [num/sum(datanumber_list) for num in datanumber_list]
             print(weight_dict)
             
+            # Each client's loss based on the new updated global model
+            loss_dict = []
+            
             #Ready to start
             for epoch in range(n_max_epochs):
                 if all(early_stop_dict):
@@ -621,7 +646,7 @@ class MGN_NET(torch.nn.Module):
                 involved_clients = [i for (i, v) in zip(all_clients, early_stop_dict) if not v]
                 
                 # if fed and epoch % update_freq == 0:
-                if fed and epoch % update_freq == 0 and epoch != 0:
+                if fed and epoch % update_freq == 0 and (epoch != 0 or config.half_combine):
                     # send models to non_stopped clients
                     print("send model to clients")
                     MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
@@ -709,6 +734,7 @@ class MGN_NET(torch.nn.Module):
                         loss = torch.add(loss, torch.mul(torch.mul(weight_diff, weight_diff), config.mu * 0.5))
                     kl_loss = torch.mean(torch.stack(kl_losses))
                     rep_loss = torch.mean(torch.stack(rep_losses))
+  
                     if not fed:
                         loss_vs_epoch[i][j][0][epoch] = loss
                         rep_vs_epoch[i][j][0][epoch] = rep_loss
@@ -732,6 +758,16 @@ class MGN_NET(torch.nn.Module):
                     
                 # print("local finish")
                 
+                # update the rank in the broadcasting epoch, before updating main model
+                if fed and epoch != 0 and epoch % update_freq == 0:
+                    loss_dict = []
+                    for client in range(number_of_clients):
+                        cbt = MGN_NET.generate_cbt_median(main_model, all_train_data_casted)
+                        rep_loss = MGN_NET.mean_frobenious_distance(cbt, train_casted_dict[client])
+                        # kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, train_casted_dict[client], six_views = (number_views==6))
+                        rep_loss = float(rep_loss)
+                        loss_dict.append(rep_loss)
+                        
                 # update main model
                 if fed and epoch != 0 and (epoch+1) % update_freq == 0:
                     print("10 local rounds finished")
@@ -749,7 +785,7 @@ class MGN_NET(torch.nn.Module):
                     # update main models from all parameters received
                     main_model = MGN_NET.set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, \
                                       model_dict, number_of_clients, \
-                                        non_stragglers, last_updated_dict, epoch+1, datanumber_list, weight_dict)
+                                        non_stragglers, last_updated_dict, epoch+1, datanumber_list, weight_dict, loss_dict)
                     print("update main model")       
                 
                     # # send models to all clients
