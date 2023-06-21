@@ -1,7 +1,7 @@
 import torch
 import helper
 import config
-from config import number_of_clients, early_stop_rounds, temporal_weighting, average_all
+from config import number_of_clients, early_stop_rounds, average_all
 import copy
 import random
 import uuid
@@ -232,9 +232,9 @@ class MGN_NET(torch.nn.Module):
         '''
         with torch.no_grad():
             if config.half_combine:
-                for i in range(number_of_samples): # clients_with_access 
-                    r1 = 0.5 
-                    r2 = 0.5
+                for i in clients_with_access:
+                    r1 = 0.4
+                    r2 = 0.6
                     model_dict[i].conv1.nn[0].weight.data = r1 * main_model.conv1.nn[0].weight.data.clone() + r2 * model_dict[i].conv1.nn[0].weight.data.clone()
                     model_dict[i].conv1.nn[0].bias.data = r1 * main_model.conv1.nn[0].bias.data.clone() + r2 * model_dict[i].conv1.nn[0].bias.data.clone()
                     model_dict[i].conv1.bias.data = r1 * main_model.conv1.bias.data.clone() + r2 * model_dict[i].conv1.bias.data.clone()
@@ -249,8 +249,9 @@ class MGN_NET(torch.nn.Module):
                     model_dict[i].conv3.nn[0].bias.data = r1 * main_model.conv3.nn[0].bias.data.clone() + r2 * model_dict[i].conv3.nn[0].bias.data.clone()
                     model_dict[i].conv3.bias.data = r1 * main_model.conv3.bias.data.clone() + r2 * model_dict[i].conv3.bias.data.clone()
                     model_dict[i].conv3.lin.weight.data = r1 * main_model.conv3.lin.weight.data.clone() + r2 * model_dict[i].conv3.lin.weight.data.clone()
+                    
             elif config.simplytake_combine:
-                for i in range(number_of_samples): # clients_with_access 
+                for i in clients_with_access:
 
                     model_dict[i].conv1.nn[0].weight.data = main_model.conv1.nn[0].weight.data.clone()
                     model_dict[i].conv1.nn[0].bias.data = main_model.conv1.nn[0].bias.data.clone()
@@ -384,10 +385,11 @@ class MGN_NET(torch.nn.Module):
         conv3_root_bias = 0
         
         cls = None # 
-        if average_all:
-            cls = range(number_of_samples)
-        else:
-            cls = clients_with_access
+        # if average_all:
+        #     cls = range(number_of_samples)
+        # else:
+        #     cls = clients_with_access
+        cls = range(number_of_samples)
 
         with torch.no_grad():
             def getWeight_i(i):
@@ -399,12 +401,7 @@ class MGN_NET(torch.nn.Module):
             all_weights = sum(getWeight_i(i) for i in cls)
             # print(all_weights)
             for i in cls: # cls
-                if temporal_weighting:
-                    client_weight = getWeight_i(i) / all_weights
-                    # print(client_weight)
-                else:
-                    # Simply average with equal weights
-                    client_weight = 1/len(cls)
+                client_weight = getWeight_i(i) / all_weights
                 print(client_weight)
 
                 conv1_nn_mean_weight += (client_weight * model_dict[i].conv1.nn[0].weight.data.clone())
@@ -583,7 +580,8 @@ class MGN_NET(torch.nn.Module):
         helper.clear_dir("temp")
         helper.clear_dir(save_path)
         
-            
+        global_rep = 0
+        global_kl = 0
         model_id = str(uuid.uuid4())
         model_params = config.PARAMS
         # Same shape with loss_compare_list
@@ -614,11 +612,14 @@ class MGN_NET(torch.nn.Module):
                     print("finish")
                     break
                 
+                all_clients = list(range(0, number_of_clients))
+                involved_clients = [i for (i, v) in zip(all_clients, early_stop_dict) if not v]
+
                 if fed and epoch % update_freq == 0:
-                    # send models to all clients
+                    # send models to non_stopped clients
                     print("send model to clients")
                     MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
-                                                                number_of_clients, list(range(0, number_of_clients)))
+                                                                number_of_clients, involved_clients)
                     
                 #     # print("main model updated, and send to all clients")
                     
@@ -725,11 +726,11 @@ class MGN_NET(torch.nn.Module):
                 
                 # update main model
                 if fed and epoch != 0 and (epoch+1) % update_freq == 0:
-                    all_clents = list(range(0, number_of_clients))
-                    all_clents = [i for (i, v) in zip(all_clents, early_stop_dict) if not v]
+                    all_clients = list(range(0, number_of_clients))
+                    all_clients = [i for (i, v) in zip(all_clients, early_stop_dict) if not v]
                     # control the number of stragglers
                     portion = config.portion
-                    non_stragglers = random.sample(all_clents, max(int(portion * len(all_clents)), 1))
+                    non_stragglers = random.sample(all_clients, max(int(portion * len(all_clients)), 1))
                     # Manually set which client to stragglers
                     # non_stragglers = [0]
                     if not non_stragglers:
@@ -825,17 +826,20 @@ class MGN_NET(torch.nn.Module):
                 
                 
                 if (epoch+1) % 10 == 0:
-                    cbt = MGN_NET.generate_cbt_median(main_model, all_train_data_casted)
-                    rep_loss = MGN_NET.mean_frobenious_distance(cbt, test_casted)
-                    kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, test_casted, six_views = (number_views==6))
-                    rep_loss = float(rep_loss)
-                    print("Epoch: {}  |  Client: {}  |  {} Rep: {:.2f}  |  KL: {:.2f} | Time Elapsed: {:.2f}  |".format(epoch, "Global",
-                            data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4+kl5+kl6), time_elapsed))
+                    if fed:
+                        cbt = MGN_NET.generate_cbt_median(main_model, all_train_data_casted)
+                        rep_loss = MGN_NET.mean_frobenious_distance(cbt, test_casted)
+                        kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, test_casted, six_views = (number_views==6))
+                        rep_loss = float(rep_loss)
+                        print("Epoch: {}  |  Client: {}  |  {} Rep: {}  |  KL: {} | Time Elapsed: {:.2f}  |".format(epoch, "Global",
+                                data_path.split("/")[-1].split(" ")[0], rep_loss, float(kl1+kl2+kl3+kl4+kl5+kl6), time_elapsed))
+                        
                 # The end of a epoch
                 print()
                 
                 
-                            
+            temp1 = []
+            temp2 = []
             for j in range(number_of_clients):
                 model = model_dict[j]
                 test_errors_rep = test_errors_rep_dict[j]
@@ -858,7 +862,30 @@ class MGN_NET(torch.nn.Module):
                 helper.save_cbt(cbt, i, j, fed)
                 
                 print("FINAL RESULTS  Client {}  REP: {}  KL: {}".format(j, rep_loss, kl_loss))
-                
+                temp1.append(rep_loss)
+                temp2.append(kl_loss)
                 loss_table.append((rep_loss, kl_loss))
+                
             loss_table_list.append(loss_table)
+            
+            if fed:
+                cbt = MGN_NET.generate_cbt_median(main_model, all_train_data_casted)
+                rep_loss = MGN_NET.mean_frobenious_distance(cbt, test_casted)
+                kl1, kl2, kl3, kl4, kl5, kl6 = MGN_NET.KL_error(cbt, test_casted, six_views = (number_views==6))
+                rep_loss = float(rep_loss)
+                print("FINAL RESULTS Client: {}  Rep: {}  KL: {}".format("Global",
+                                 rep_loss, float(kl1+kl2+kl3+kl4+kl5+kl6)))
+                global_rep += rep_loss
+                global_kl += float(kl1+kl2+kl3+kl4+kl5+kl6)
+                
+            # Manually calculate non_fed's final evaluation error
+            if not fed:
+                print("Epoch: {}  |  Client: {}  |  {} Rep: {:.2f}  |  KL: {:.2f} | Time Elapsed: {:.2f}  |".format(epoch, "Global",
+                                data_path.split("/")[-1].split(" ")[0], sum(temp1)/len(temp1), sum(temp2)/len(temp2), time_elapsed))
+                global_rep += sum(temp1)/len(temp1)
+                global_kl +=  sum(temp2)/len(temp2)
+        print(global_rep/n_folds)
+        print(global_kl/n_folds)
         return models
+
+        

@@ -40,7 +40,7 @@ non_iid_by_clustering = False
 self_adaptive = False
 
 # take 0.5 of global and 0.5 of client
-half_combine = True
+half_combine = False
 # take 1 if global
 simplytake_combine = True
 
@@ -50,8 +50,6 @@ fedavg = True
 n_max_epochs = 500
 early_stop = True
 # update_freq = 1
-
-temporal_weighting = True
 
 mu = 0.001
 
