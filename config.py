@@ -35,9 +35,12 @@ portion = 1
 non_iid_by_numbers = False
 
 # Split the data in an non-iid way for each client by using clustering
-non_iid_by_clustering = False
+non_iid_by_clustering = True
 
-self_adaptive = False
+boardcast_first = True
+
+# Directly use TW when there exist clients with early stopping
+rank_with_tw = False
 
 # take 0.5 of global and 0.5 of client
 half_combine = True
@@ -45,11 +48,12 @@ half_combine = True
 # take 1 if global
 simplytake_combine = True
 
-
 # fed-rank
 rank = True
 # Determines the portion of weight transfer. 1 is default
 rank_factor = 1
+
+rankprime = False
 
 # Temporal Weighting
 tw = True
@@ -59,13 +63,11 @@ fedavg = True
 
 n_max_epochs = 500
 early_stop = True
-# update_freq = 1
 
 mu = 0.001
 
 # Normalize views when calculating rep loss to avoid overfitting large-number views
 weighted_loss = True
-average_all = False
 
 # Should be decided by input shape
 number_of_views = 6

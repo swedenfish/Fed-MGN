@@ -1,7 +1,7 @@
 import torch
 import helper
 import config
-from config import number_of_clients, early_stop_rounds, average_all
+from config import number_of_clients, early_stop_rounds
 import copy
 import random
 import uuid
@@ -235,7 +235,6 @@ class MGN_NET(torch.nn.Module):
                 for i in clients_with_access:
                     r1 = combine_weight_dict[i]
                     r2 = 1 - r1
-                    print(r1)
                     model_dict[i].conv1.nn[0].weight.data = r1 * main_model.conv1.nn[0].weight.data.clone() + r2 * model_dict[i].conv1.nn[0].weight.data.clone()
                     model_dict[i].conv1.nn[0].bias.data = r1 * main_model.conv1.nn[0].bias.data.clone() + r2 * model_dict[i].conv1.nn[0].bias.data.clone()
                     model_dict[i].conv1.bias.data = r1 * main_model.conv1.bias.data.clone() + r2 * model_dict[i].conv1.bias.data.clone()
@@ -326,7 +325,7 @@ class MGN_NET(torch.nn.Module):
         return diff_sum
         
         
-    def update_weight_dict(loss_dict, weight_dict, combine_weight_dict):
+    def update_weight_dict(loss_dict, weight_dict, combine_weight_dict, datanumber_list):
         if loss_dict != []:
             loss_pair = [(loss_dict[i], i) for i in range(len(loss_dict))]
             loss_pair.sort()
@@ -340,15 +339,20 @@ class MGN_NET(torch.nn.Module):
                 # The one lossing weights (it has larger loss)
                 tail_index = -i-1
                 (tail_loss, tail_client_index) = loss_pair[tail_index]
-                diff = tail_loss - head_loss
-                rank_factor = config.rank_factor
-                portion = rank_factor * (diff / mid_loss)
-                amount = portion * weight_dict[tail_client_index]
-                weight_dict[tail_client_index] -= amount
-                weight_dict[head_client_index] += amount
+                head_diff = abs(mid_loss - head_loss)
+                tail_diff = abs(tail_loss - mid_loss)
+                head_rank_factor = datanumber_list[head_index] / sum(datanumber_list)
+                tail_rank_factor = datanumber_list[tail_index] / sum(datanumber_list)
+                head_amount = head_rank_factor * (head_diff / head_loss)
+                tail_amount = tail_rank_factor * (tail_diff / tail_loss)
+                print(head_amount)
+                print(tail_amount)
+                weight_dict[tail_client_index] -= tail_amount
+                weight_dict[head_client_index] += head_amount
                 
-                combine_weight_dict[head_index] = combine_weight_dict[head_index] * (1- 10 * (diff / mid_loss))
-                combine_weight_dict[tail_index] = 1 - (1-combine_weight_dict[tail_index]) * (1- 10 * (diff / mid_loss))
+                # if config.rankprime:
+                #     combine_weight_dict[head_index] = combine_weight_dict[head_index] * (1- head_rank_factor * (head_diff / head_loss))
+                #     combine_weight_dict[tail_index] = 1 - (1-combine_weight_dict[tail_index]) * (1- 10 * (diff / mid_loss))
         return
     
     def set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, model_dict, \
@@ -357,13 +361,13 @@ class MGN_NET(torch.nn.Module):
         '''
         This function takes combined weights for global model and assigns them to the global model.
         '''
-        MGN_NET.update_weight_dict(loss_dict, weight_dict, combine_weight_dict)
+        MGN_NET.update_weight_dict(loss_dict, weight_dict, combine_weight_dict, datanumber_list)
         
         conv1_nn_mean_weight, conv1_nn_mean_bias, conv1_bias, conv1_root_weight, conv1_root_bias, \
         conv2_nn_mean_weight, conv2_nn_mean_bias, conv2_bias, conv2_root_weight, conv2_root_bias, \
         conv3_nn_mean_weight, conv3_nn_mean_bias, conv3_bias, conv3_root_weight, conv3_root_bias = MGN_NET.get_averaged_weights(model_dict, \
                                                             number_of_samples, clients_with_access,datanumber_list, \
-                                                            average_all, last_updated_dict, current_epoch, weight_dict)
+                                                            last_updated_dict, current_epoch, weight_dict)
         
         with torch.no_grad():
             main_model.conv1.nn[0].weight.data = conv1_nn_mean_weight.clone()
@@ -384,7 +388,7 @@ class MGN_NET(torch.nn.Module):
         return main_model
 
     def get_averaged_weights(model_dict, number_of_samples, clients_with_access,datanumber_list, \
-                         average_all=True, last_updated_dict=None, current_epoch=-1, weight_dict = None):
+                         last_updated_dict=None, current_epoch=-1, weight_dict = None):
         '''
         This function averages model weights after a designated number of round so that we can have the weights of the global model
         that takes full advantage of introduced devices in the federated pipeline.
@@ -412,20 +416,22 @@ class MGN_NET(torch.nn.Module):
         conv3_root_bias = 0
         
         cls = None # 
-        # if average_all:
-        #     cls = range(number_of_samples)
-        # else:
-        #     cls = clients_with_access
         cls = range(number_of_samples)
 
         with torch.no_grad():
             def getWeight_i(i):
-                if config.rank:
-                    return weight_dict[i]
-                elif config.tw:
-                    return ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
-                elif config.fedavg:
-                    return datanumber_list[i]
+                if not config.rank_with_tw:
+                    if config.rank:
+                        return weight_dict[i] * ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
+                    elif config.tw:
+                        return ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
+                    elif config.fedavg:
+                        return datanumber_list[i]
+                else:
+                    if all(elem == last_updated_dict[0] for elem in last_updated_dict):
+                        return weight_dict[i] * ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
+                    else:
+                        return ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
                 
             all_weights = sum(getWeight_i(i) for i in cls)
             # print(all_weights)
@@ -636,7 +642,7 @@ class MGN_NET(torch.nn.Module):
             early_stop_dict = [False] * number_of_clients
             last_updated_dict = [0] * number_of_clients
             weight_dict = [num/sum(datanumber_list) for num in datanumber_list]
-            print(weight_dict)
+            # print(weight_dict)
             
             # Each client's loss based on the new updated global model
             loss_dict = []
@@ -654,14 +660,15 @@ class MGN_NET(torch.nn.Module):
                 involved_clients = [i for (i, v) in zip(all_clients, early_stop_dict) if not v]
                 
                 # if fed and epoch % update_freq == 0:
-                if fed and epoch % update_freq == 0 and (epoch != 0 or config.half_combine):
+                if fed and epoch % update_freq == 0 and (epoch != 0 or config.boardcast_first):
+                # if fed and epoch % update_freq == 0 and epoch != 0:
                     # send models to non_stopped clients
                     print("send model to clients")
                     MGN_NET.send_main_model_to_nodes_and_update_model_dict(main_model, model_dict, \
                                                                 number_of_clients, involved_clients, combine_weight_dict)
                     for i in involved_clients:
                         last_updated_dict[i] = epoch
-                    print(last_updated_dict)
+                    # print(last_updated_dict)
                 # print("main model updated, and send to all clients")
                     
                 # Each client trains its model locally

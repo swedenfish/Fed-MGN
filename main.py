@@ -11,8 +11,8 @@ from datetime import datetime
 
 # Load dataset from MAT files
 helper.clear_dir("input")
-# helper.load_input_from_dir_of_mats("data_nc_asd_L/NC LH")
-helper.load_input_from_dir_of_mats("data_nc_asd_L/ASD LH")
+helper.load_input_from_dir_of_mats("data_nc_asd_L/NC LH")
+# helper.load_input_from_dir_of_mats("data_nc_asd_L/ASD LH")
 
 loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
 rep_loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
