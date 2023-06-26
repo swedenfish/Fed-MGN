@@ -345,14 +345,17 @@ class MGN_NET(torch.nn.Module):
                 tail_rank_factor = datanumber_list[tail_index] / sum(datanumber_list)
                 head_amount = head_rank_factor * (head_diff / head_loss)
                 tail_amount = tail_rank_factor * (tail_diff / tail_loss)
-                print(head_amount)
-                print(tail_amount)
+                # print(head_amount)
+                # print(tail_amount)
                 weight_dict[tail_client_index] -= tail_amount
                 weight_dict[head_client_index] += head_amount
                 
-                # if config.rankprime:
-                #     combine_weight_dict[head_index] = combine_weight_dict[head_index] * (1- head_rank_factor * (head_diff / head_loss))
-                #     combine_weight_dict[tail_index] = 1 - (1-combine_weight_dict[tail_index]) * (1- 10 * (diff / mid_loss))
+                if config.rankprime:
+                    # combine_weight_dict[head_index] = combine_weight_dict[head_index] * (1- head_rank_factor * (head_diff / head_loss))
+                    # combine_weight_dict[tail_index] = 1 - (1-combine_weight_dict[tail_index]) * (1- 10 * (diff / mid_loss))
+                    combine_weight_dict[head_index] = max(0, combine_weight_dict[head_index] - head_amount)
+                    combine_weight_dict[tail_index] = min(1, combine_weight_dict[tail_index] + tail_amount)
+                    print(combine_weight_dict)
         return
     
     def set_averaged_weights_as_main_model_weights_and_update_main_model(main_model, model_dict, \
@@ -420,7 +423,7 @@ class MGN_NET(torch.nn.Module):
 
         with torch.no_grad():
             def getWeight_i(i):
-                if not config.rank_with_tw:
+                if not config.twavg:
                     if config.rank:
                         return weight_dict[i] * ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
                     elif config.tw:
@@ -429,7 +432,8 @@ class MGN_NET(torch.nn.Module):
                         return datanumber_list[i]
                 else:
                     if all(elem == last_updated_dict[0] for elem in last_updated_dict):
-                        return weight_dict[i] * ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
+                        # return weight_dict[i] * ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
+                        return datanumber_list[i] / sum(datanumber_list)
                     else:
                         return ((np.e / 2) ** (- (current_epoch - last_updated_dict[i])))
                 
@@ -641,7 +645,10 @@ class MGN_NET(torch.nn.Module):
             tick = time.time()
             early_stop_dict = [False] * number_of_clients
             last_updated_dict = [0] * number_of_clients
+            # Initializing following fed-avg
             weight_dict = [num/sum(datanumber_list) for num in datanumber_list]
+            # Initializing with same weight
+            # weight_dict = [1/number_of_clients] * number_of_clients
             # print(weight_dict)
             
             # Each client's loss based on the new updated global model

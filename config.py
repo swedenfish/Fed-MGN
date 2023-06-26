@@ -39,8 +39,8 @@ non_iid_by_clustering = True
 
 boardcast_first = True
 
-# Directly use TW when there exist clients with early stopping
-rank_with_tw = False
+# For TW. Directly use TW when there exist clients with early stopping, otherwise fed-avg
+twavg = False
 
 # take 0.5 of global and 0.5 of client
 half_combine = True
@@ -53,7 +53,7 @@ rank = True
 # Determines the portion of weight transfer. 1 is default
 rank_factor = 1
 
-rankprime = False
+rankprime = True
 
 # Temporal Weighting
 tw = True

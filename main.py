@@ -8,11 +8,12 @@ import numpy as np
 import shutil
 import os
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 # Load dataset from MAT files
 helper.clear_dir("input")
-helper.load_input_from_dir_of_mats("data_nc_asd_L/NC LH")
-# helper.load_input_from_dir_of_mats("data_nc_asd_L/ASD LH")
+# helper.load_input_from_dir_of_mats("data_nc_asd_L/NC LH")
+helper.load_input_from_dir_of_mats("data_nc_asd_L/ASD LH")
 
 loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
 rep_loss_compare_list = helper.loss_compare_list_init(config.number_of_folds, config.number_of_clients, config.n_max_epochs)
@@ -150,3 +151,38 @@ else:
     helper.plotLossesCompare(loss_compare_list, 0)
     helper.plotLossesCompare(rep_loss_compare_list, 1)
     helper.plotLossesCompare(kl_loss_compare_list, 2)
+
+
+
+# Final results graphing
+# def addlabels(x,y, lower):
+#     for i in range(len(x)):
+#         plt.text(i, (lower + y[i])/2 ,round(y[i], 3), ha = 'center', zorder = 20)
+
+# final_result = [("IID-ASD-LH", [11.550743182500204, 11.08506178855896, 11.0829017162323, 11.074352264404297, 11.058459043502808]), ("Non-IID-ASD-LH", [11.4338, 11.206498384475708, 11.084848642349243, 11.083147287368774, 11.08228611946106]), ("IID-NC-LH", [11.5625, 11.120790958404541, 11.118134021759033, 11.087388277053833, 11.08730173110962]), ("Non-IID-NC-LH", [11.2603, 11.174057245254517, 11.096062183380127, 11.095869779586792, 11.088101387023926])]
+
+# def plotlist_without_non_fed(name_list_pair, include_non_fed):
+#     (name, list) = name_list_pair
+#     if not include_non_fed:
+#         list = list[1:]
+#     model_list = ["NonFed", "FedAvg", "FedTW", "FedRank", "FedRank'"]
+#     color_list = ['khaki', 'pink', 'skyblue', 'lawngreen', 'salmon']
+    
+#     diff = max(list) - min(list)
+#     lower = min(list) - 0.1*diff
+#     upper = max(list) + 0.1*diff
+#     plt.ylim(lower, upper)
+#     plt.ylabel("FROBENIUS DISTANCE")
+#     plt.title(name)
+#     plt.grid(axis="y", zorder = -1)
+#     # Including non-fed
+#     if include_non_fed:
+#         plt.bar(model_list, list, color = color_list, zorder = 3)
+#         addlabels(model_list, list, lower)
+#     # Excluding non-fed
+#     else:
+#         plt.bar(model_list[1:], list, color = color_list[1:], zorder = 3)
+#         addlabels(model_list[1:], list, lower)
+#     plt.show()
+    
+# plotlist_without_non_fed(final_result[3], True)
